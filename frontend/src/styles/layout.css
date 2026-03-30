@@ -1,0 +1,70 @@
+/* ================================================
+   LAYOUT PRINCIPAL — App avec sidebar
+   ================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --sidebar-width: 260px;
+  --primary: #1a56db;
+  --bg-page: #f8fafc;
+  --text: #1e293b;
+  --text-light: #64748b;
+  --border: #e2e8f0;
+  --white: #ffffff;
+}
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+/* Décalage du contenu pour la sidebar fixe */
+.main-content {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  padding: 2rem;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ── En-tête de page ────────────────────────── */
+.page-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.page-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Corps de page ──────────────────────────── */
+.page-body {
+  /* Zone de contenu */
+}
+
+/* ── Placeholder "coming soon" ──────────────── */
+.coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem;
+  background: var(--white);
+  border-radius: 16px;
+  border: 2px dashed var(--border);
+  color: var(--text-light);
+  gap: 1rem;
+}
+
+.coming-soon span {
+  font-size: 3.5rem;
+}
+
+.coming-soon p {
+  font-size: 1rem;
+  font-weight: 500;
+}

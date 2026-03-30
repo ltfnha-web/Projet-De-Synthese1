@@ -1,0 +1,176 @@
+/* ================================================
+   SIDEBAR / NAVBAR — Design Professionnel
+   ================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --sidebar-bg:     #0f172a;
+  --sidebar-hover:  #1e293b;
+  --sidebar-active: #1a56db;
+  --sidebar-text:   #94a3b8;
+  --sidebar-light:  #e2e8f0;
+  --sidebar-width:  260px;
+  --primary:        #1a56db;
+}
+
+/* ── Sidebar ────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-width);
+  min-height: 100vh;
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0; top: 0;
+  z-index: 100;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+}
+
+/* ── Header sidebar ─────────────────────────── */
+.sidebar-header {
+  padding: 1.75rem 1.5rem 1rem;
+  border-bottom: 1px solid #1e293b;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-icon {
+  font-size: 1.8rem;
+}
+
+.logo-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 3px;
+}
+
+.sidebar-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.7rem;
+  color: var(--sidebar-text);
+  margin-top: 0.25rem;
+  letter-spacing: 0.5px;
+}
+
+/* ── User info ──────────────────────────────── */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #1e293b;
+}
+
+.user-avatar {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--primary), #3b82f6);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+.user-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sidebar-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Badge rôle ─────────────────────────────── */
+.role-badge {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  margin-top: 3px;
+}
+
+.role-directeur   { background: rgba(26,86,219,0.2);  color: #60a5fa; }
+.role-surveillant { background: rgba(16,185,129,0.2); color: #34d399; }
+.role-formateur   { background: rgba(245,158,11,0.2); color: #fbbf24; }
+
+/* ── Navigation ─────────────────────────────── */
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0.75rem;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--sidebar-text);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-bottom: 2px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.nav-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-light);
+}
+
+.nav-item--active {
+  background: var(--sidebar-active);
+  color: white;
+  font-weight: 500;
+}
+
+.nav-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* ── Footer sidebar (déconnexion) ───────────── */
+.sidebar-footer {
+  padding: 1rem 0.75rem 1.5rem;
+  border-top: 1px solid #1e293b;
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  background: transparent;
+  border: 1px solid #ef4444;
+  border-radius: 10px;
+  color: #ef4444;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s, color 0.2s;
+}
+
+.logout-btn:hover {
+  background: #ef4444;
+  color: white;
+}
