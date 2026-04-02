@@ -3,113 +3,116 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "../styles/login.css";
 
-// Redirection selon le rôle après connexion
+
 const ROLE_REDIRECTS = {
-  directeur:   "/directeur/dashboard",
+  directeur: "/directeur/dashboard",
   surveillant: "/surveillant/planning",
-  formateur:   "/formateur/seances",
+  formateur: "/formateur/seances",
 };
 
 export default function Login() {
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error,    setError]    = useState("");
-  const [loading,  setLoading]  = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { login } = useAuth();
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault();     // empêche le rechargement de la page
+    e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const user     = await login(email, password); // appel API Laravel
+      const user = await login(email, password);
       const redirect = ROLE_REDIRECTS[user.role] || "/";
-      navigate(redirect, { replace: true });         // redirection selon rôle
+      navigate(redirect);
     } catch (err) {
-      const msg = err.response?.data?.message || "Email ou mot de passe incorrect.";
-      setError(msg);
+      setError("Email ou mot de passe incorrect");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container">
-
-      {/* ── Navbar ────────────────────────────── */}
+    <>
+      {/* NAVBAR */}
       <nav className="navbar">
-        <h2 className="logo">🎓 PedagoSys</h2>
-      </nav>
-
-      {/* ── Hero ──────────────────────────────── */}
-      <div className="hero">
-
-        {/* Gauche : présentation */}
-        <div className="hero-left">
-          <h1>
-            Plateforme de <span>Gestion Pédagogique</span>
-          </h1>
-          <p>
-            Organisez vos cours, vos étudiants et vos ressources
-            dans une seule plateforme.
-          </p>
-          <button className="start-btn">
-            Service Stagiaire
-          </button>
+        <div className="brand">
+          <div className="brand-logo">
+            <img src="logoOfppt.png" alt="logo" />
+          </div>
         </div>
 
-        {/* Droite : formulaire */}
-        <div className="hero-right">
-          <div className="login-card">
+        <div className="nav-right">
+          <div className="nav-item">
+            <button className="nav-icon-btn">
+              <i className="bx bxs-home"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
 
-            <h3>Connexion</h3>
+      {/* MAIN */}
+      <main className="main-content">
+        
+        {/* HERO LEFT */}
+        <div className="hero">
+          <h1 className="hero-title">
+            Plateforme de <br />
+            <span>Gestion Pédagogique</span>
+          </h1>
+          <p className="hero-desc">
+            Organisez vos cours, vos étudiants et vos ressources dans une seule plateforme.
+          </p>
+          <a href="#" className="btn-primary">
+            Service Stagiaire
+          </a>
+        </div>
 
-            {/* Affichage erreur si mauvais identifiants */}
-            {error && (
-              <div className="login-error">
-                ⚠️ {error}
-              </div>
-            )}
+        {/* LOGIN RIGHT */}
+        <div className="login-card">
+          <h2 className="login-title">Connexion</h2>
 
-            <form onSubmit={handleSubmit}>
+          {error && <div style={{ color: "red", textAlign: "center" }}>{error}</div>}
 
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
               <input
                 type="email"
-                placeholder="Email"
+                className="form-input"
+                placeholder="directeur@ofppt.ma"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
               />
+            </div>
 
+            <div className="form-group">
               <input
                 type="password"
-                placeholder="Mot de passe"
+                className="form-input"
+                placeholder="••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
               />
+            </div>
 
-              <button
-                type="submit"
-                className="connect-btn"
-                disabled={loading}
-              >
-                {loading ? "Connexion en cours..." : "Se connecter"}
-              </button>
+            <button className="btn-connect" disabled={loading}>
+              {loading ? "Connexion..." : "Se connecter"}
+            </button>
+          </form>
 
-            </form>
-
-            <p className="forgot">Mot de passe oublié ?</p>
-
-          </div>
+          <a href="#" className="forgot-link">
+            Mot de passe oublié ?
+          </a>
         </div>
 
-      </div>
-    </div>
+      </main>
+    </>
   );
 }
