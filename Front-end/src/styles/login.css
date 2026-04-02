@@ -259,7 +259,7 @@ a { text-decoration: none; color: inherit; }
 }
 
 .btn-primary:hover {
-    background: #154360;
+    background: #1a5276;
     transform: translateY(-2px);
 }
 
@@ -311,8 +311,7 @@ a { text-decoration: none; color: inherit; }
 .form-input::placeholder {
     color: #95a5b5;
 }
-
-.btn-connect {
+.btn-stg {
     padding: 13px;
     background: #1a5276;
     color: #fff;
@@ -322,12 +321,31 @@ a { text-decoration: none; color: inherit; }
     border: none;
     border-radius: 10px;
     cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
+    transition:  0.2s, transform 0.15s;
+    box-shadow: 0 4px 14px rgba(26, 82, 118, 0.3);
+    margin-top: 4px;
+    width: 40%;
+}
+.btn-connect{
+    padding: 13px;
+    background: #1a5276;
+    color: #fff;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition:  0.2s, transform 0.15s;
     box-shadow: 0 4px 14px rgba(26, 82, 118, 0.3);
     margin-top: 4px;
 }
 
 .btn-connect:hover {
+    background: #154360;
+    transform: translateY(-1px);
+}
+.btn-stg:hover {
     background: #154360;
     transform: translateY(-1px);
 }
