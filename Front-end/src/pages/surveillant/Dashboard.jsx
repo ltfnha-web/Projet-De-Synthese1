@@ -13,7 +13,7 @@ export default function SurveillantDashboard() {
   return (
     <div style={{ textAlign: "center", marginTop: "100px" }}>
 
-      <h1>✅ Surveillant Général connecté !</h1>
+      <h1>Surveillant Général  !</h1>
       <p>Bienvenue, <strong>{user?.name}</strong></p>
 
       <button onClick={handleLogout} style={{ marginTop: "20px", padding: "10px 20px" }}>

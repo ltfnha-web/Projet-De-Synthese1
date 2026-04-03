@@ -2,7 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+import Home                  from "./pages/Home";
 import Login                 from "./pages/Login";
+import EspaceStagiaire       from "./pages/EspaceStagiaire";
 import AdminLayout           from "./components/admin/AdminLayout";
 import DirecteurDashboard    from "./pages/directeur/Dashboard";
 import DirecteurFormateurs   from "./pages/directeur/Formateurs";
@@ -16,13 +18,14 @@ import FormateurDashboard    from "./pages/formateur/Dashboard";
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/home" replace />;
   const redirects = {
     directeur:   "/directeur/dashboard",
     surveillant: "/surveillant/dashboard",
     formateur:   "/formateur/dashboard",
+    stagiaire:   "/stagiaire/espace",
   };
-  return <Navigate to={redirects[user.role] || "/login"} replace />;
+  return <Navigate to={redirects[user.role] || "/home"} replace />;
 }
 
 export default function App() {
@@ -30,8 +33,14 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+
+          {/* Pages publiques */}
+          <Route path="/home"  element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/"      element={<HomeRedirect />} />
+
+          {/* Espace Stagiaire */}
+          <Route path="/stagiaire/espace" element={<EspaceStagiaire />} />
 
           {/* DIRECTEUR */}
           <Route path="/directeur" element={
@@ -47,14 +56,23 @@ export default function App() {
             <Route path="import"       element={<DirecteurImport />} />
           </Route>
 
+          {/* SURVEILLANT */}
           <Route path="/surveillant/dashboard" element={
-            <ProtectedRoute roles={["surveillant"]}><SurveillantDashboard /></ProtectedRoute>
-          } />
-          <Route path="/formateur/dashboard" element={
-            <ProtectedRoute roles={["formateur"]}><FormateurDashboard /></ProtectedRoute>
+            <ProtectedRoute roles={["surveillant"]}>
+              <SurveillantDashboard />
+            </ProtectedRoute>
           } />
 
+          {/* FORMATEUR */}
+          <Route path="/formateur/dashboard" element={
+            <ProtectedRoute roles={["formateur"]}>
+              <FormateurDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
+
         </Routes>
       </BrowserRouter>
     </AuthProvider>

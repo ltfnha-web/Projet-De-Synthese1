@@ -8,6 +8,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.14.0",
+    "boxicons": "^2.1.4",
     "chart.js": "^4.5.1",
     "react": "^19.2.4",
     "react-chartjs-2": "^5.3.1",
