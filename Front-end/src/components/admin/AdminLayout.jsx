@@ -36,13 +36,13 @@ export default function AdminLayout() {
       <aside className="sidebar">
 
         {/* Header */}
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">{Icons.logo}</div>
-            <div>
-              <div className="sidebar-logo-text">PedagoSys</div>
-              <div className="sidebar-logo-sub">ISTA Hay Salam</div>
-            </div>
+       <div className="brand">
+          <div className="brand-logo">
+            <img src="/logoOfppt.png" alt="logo OFPPT" />
+          </div>
+          <div className="brand-info">
+            <span className="brand-name">OFPPT</span>
+            <span className="brand-sub">Gestion Pédagogique</span>
           </div>
         </div>
 
