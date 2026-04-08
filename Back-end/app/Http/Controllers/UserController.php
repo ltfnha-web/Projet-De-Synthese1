@@ -178,30 +178,63 @@ class UserController extends Controller
             ->orderBy('annee_formation')
             ->get();
 
+        $groupesData = DB::table('modules')
+    ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
+    ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+    ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id')
+    ->select(
+        'groupes.id as groupe_id',
+        DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
+                 THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif)
+                 ELSE 0 END as avc'),
+        DB::raw('SUM(CASE WHEN modules.seance_efm = "Oui" THEN 1 ELSE 0 END) as has_efm'),
+        DB::raw('SUM(CASE WHEN modules.mh_realisee_globale = 0 THEN 1 ELSE 0 END) as modules_non_demarres'),
+        DB::raw('COUNT(modules.id) as total_modules')
+    )
+    ->groupBy('groupes.id')
+    ->get();
+
+    $alertesCount = 0;
+foreach ($groupesData as $g) {
+    // 1. AVC CRITIQUE < 30%
+    if ($g->avc < 0.30) {
+        $alertesCount++;
+    }
+    // 2. EFM prévu + AVC entre 30% et 50%
+    if ($g->has_efm > 0 && $g->avc >= 0.30 && $g->avc < 0.50) {
+        $alertesCount++;
+    }
+    // 3. AVC FAIBLE 30–50% sans EFM
+    if ($g->avc >= 0.30 && $g->avc < 0.50 && $g->has_efm == 0) {
+        $alertesCount++;
+    }
+    // 4. Modules non démarrés > 20%
+    if ($g->total_modules > 0 && ($g->modules_non_demarres / $g->total_modules) > 0.20) {
+        $alertesCount++;
+    }
+}
+   
+
         return response()->json([
-            // Compteurs
-            'total_formateurs'    => $totalFormateurs,
-            'total_groupes'       => $totalGroupes,
-            'total_modules'       => $totalModules,
-            'total_filieres'      => $totalFilieres,
-            'total_secteurs'      => $totalSecteurs,
-            'total_surveillants'  => $totalSurveillants,
-            // MH
-            'mh_realisee_totale'  => round($mhRealisee),
-            'mh_restante_totale'  => round($mhRestante),
-            'mh_drif_totale'      => round($mhDrif),
-            // AVC & Effectif
-            'avc_moyen_global'    => round($avcMoyen, 4),
-            'effectif_total'      => $effectifTotal,
-            // Charts
-            'avc_par_secteur'     => $avcParSecteur,
-            'distribution_groupes'=> $distribution,
-            'mh_par_filiere'      => $mhParFiliere,
-            'groupes_par_niveau'  => $groupesParNiveau,
-            // Compatibilité ancienne version
-            'formateurs_actifs'   => Formateur::where('statut', 'actif')->count(),
-            'formateurs_inactifs' => Formateur::where('statut', 'inactif')->count(),
-            'par_specialite'      => [],
+    'total_formateurs'    => $totalFormateurs,
+    'total_groupes'       => $totalGroupes,
+    'total_modules'       => $totalModules,
+    'total_filieres'      => $totalFilieres,
+    'total_secteurs'      => $totalSecteurs,
+    'total_surveillants'  => $totalSurveillants,
+    'mh_realisee_totale'  => round($mhRealisee),
+    'mh_restante_totale'  => round($mhRestante),
+    'mh_drif_totale'      => round($mhDrif),
+    'avc_moyen_global'    => round($avcMoyen, 4),
+    'effectif_total'      => $effectifTotal,
+    'avc_par_secteur'     => $avcParSecteur,
+    'distribution_groupes'=> $distribution,
+    'mh_par_filiere'      => $mhParFiliere,
+    'groupes_par_niveau'  => $groupesParNiveau,
+    'formateurs_actifs'   => Formateur::where('statut', 'actif')->count(),
+    'formateurs_inactifs' => Formateur::where('statut', 'inactif')->count(),
+    'par_specialite'      => [],
+    'alertes_count'       => $alertesCount,   // ← AJOUTER
         ]);
     }
 }

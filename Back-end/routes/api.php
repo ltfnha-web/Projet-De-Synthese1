@@ -6,6 +6,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\FormateurController;
 use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\ModuleController;
+use App\Http\Controllers\PoleController;
+use App\Http\Controllers\AlerteController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ──
@@ -41,6 +43,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Import Excel BASE PLATE
         Route::post('/import/base-plate', [ImportController::class, 'import']);
+
+        // ── POLE (Responsables de secteurs) ──
+        Route::get('/pole',                   [PoleController::class, 'index']);
+        Route::get('/pole/{secteur}/groupes', [PoleController::class, 'groupesSecteur']);
+        Route::post('/pole/assign',           [PoleController::class, 'assign']);
+        Route::delete('/pole/{secteur}',      [PoleController::class, 'remove']);
+
+        // ── ALERTES pédagogiques ──
+        Route::get('/alertes', [AlerteController::class, 'index']);
     });
 
     // ── SURVEILLANT ──

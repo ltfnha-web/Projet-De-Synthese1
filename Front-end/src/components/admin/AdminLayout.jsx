@@ -1,154 +1,153 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import "./AdminLayout.css";
 import { Icons } from "./Icons";
+import "./AdminLayout.css";
 
-const NAV = [
+/* ── Nav items ── */
+const NAV_MAIN = [
   { to: "/directeur/dashboard",    label: "Tableau de bord", icon: "dashboard" },
   { to: "/directeur/formateurs",   label: "Formateurs",      icon: "users"     },
-  { to: "/directeur/surveillants", label: "Surveillants",    icon: "eye"       },
+  { to: "/directeur/pole",         label: "Pôle",            icon: "target"    },
   { to: "/directeur/groupes",      label: "Groupes",         icon: "groups"    },
   { to: "/directeur/modules",      label: "Modules",         icon: "book"      },
-  { to: "/directeur/import",       label: "Import Excel",    icon: "upload"    },
+  { to: "/directeur/alertes",      label: "Alertes",         icon: "alert",    badge: true },
+  { to: "/directeur/import",       label: "Import",          icon: "upload"    },
 ];
 
 function getInitials(name = "") {
-  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [navStats, setNavStats] = useState(null);
+  const navigate         = useNavigate();
+  const location         = useLocation();
+  const [navStats, setNavStats]   = useState(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     axios.get("/stats").then(r => setNavStats(r.data)).catch(() => {});
   }, []);
 
+  // Close menu on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setUserMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const handleLogout = async () => { await logout(); navigate("/login"); };
 
+  const alertCount = navStats?.alertes_count || 0;
+
   return (
-    <div className="aw">
+    <div className="al-wrap">
 
-      {/* ═══ SIDEBAR ═══ */}
-      <aside className="sidebar">
+      {/* ══════════════════════════════════════════
+          TOPBAR (horizontal, matches login navbar)
+      ══════════════════════════════════════════ */}
+      <header className="al-topbar">
 
-        {/* Header */}
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">{Icons.logo}</div>
-            <div>
-              <div className="sidebar-logo-text">PedagoSys</div>
-              <div className="sidebar-logo-sub">ISTA Hay Salam</div>
-            </div>
+        {/* Brand — same as login */}
+        <div className="al-brand">
+          <div className="al-brand-logo">
+            <img src="/logoOfppt.png" alt="ISTA" onError={e => { e.target.style.display = "none"; }} />
+          </div>
+          <div className="al-brand-info">
+            <span className="al-brand-name">ISTA Hay Salam</span>
+            <span className="al-brand-sub">Espace Directeur</span>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="sidebar-nav">
-          <div className="nav-section-label">Navigation</div>
-          {NAV.map(item => (
+        {/* Nav links — horizontal */}
+        <nav className="al-nav">
+          {NAV_MAIN.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
-              className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
+              className={({ isActive }) => "al-nav-item" + (isActive ? " active" : "")}
             >
-              <div className="nav-icon-wrap">{Icons[item.icon]}</div>
+              <span className="al-nav-icon">{Icons[item.icon]}</span>
               <span>{item.label}</span>
-              {item.to === "/directeur/formateurs" && navStats?.total_formateurs > 0 && (
-                <span className="nav-badge">{navStats.total_formateurs}</span>
-              )}
-              {item.to === "/directeur/groupes" && navStats?.total_groupes > 0 && (
-                <span className="nav-badge">{navStats.total_groupes}</span>
-              )}
-              {item.to === "/directeur/modules" && navStats?.total_modules > 0 && (
-                <span className="nav-badge">{navStats.total_modules}</span>
+              {item.badge && alertCount > 0 && (
+                <span className="al-nav-badge">{alertCount > 99 ? "99+" : alertCount}</span>
               )}
             </NavLink>
           ))}
         </nav>
 
-        {/* Aperçu rapide */}
-        {navStats && (
-          <div className="sidebar-stats">
-            <div className="sidebar-stats-label">Aperçu rapide</div>
-            {[
-              ["Formateurs",  navStats.total_formateurs],
-              ["Groupes",     navStats.total_groupes],
-              ["Modules",     navStats.total_modules],
-              ["Filières",    navStats.total_filieres],
-            ].map(([label, val]) => (
-              <div key={label} className="sidebar-stat-row">
-                <span>{label}</span>
-                <span>{val ?? 0}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Right — KPIs + user */}
+        <div className="al-topbar-right">
 
-        {/* Footer */}
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{getInitials(user?.name)}</div>
-            <div>
-              <div className="sidebar-user-name">{user?.name}</div>
-              <div className="sidebar-user-role">Directeur</div>
+          {/* KPI pills */}
+          {navStats && (
+            <div className="al-kpis">
+              <span className="al-kpi al-kpi-blue">
+                {Icons.avc}
+                {((navStats.avc_moyen_global || 0) * 100).toFixed(1)}% AVC
+              </span>
+              <span className="al-kpi al-kpi-green">
+                {Icons.check}
+                {navStats.mh_realisee_totale?.toLocaleString()}h
+              </span>
+              {alertCount > 0 && (
+                <span className="al-kpi al-kpi-red">
+                  {Icons.alert}
+                  {alertCount} alerte{alertCount > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
-          </div>
-          <button className="sidebar-logout" onClick={handleLogout}>
-            {Icons.logout}
-            <span>Déconnexion</span>
-          </button>
-        </div>
-      </aside>
+          )}
 
-      {/* ═══ MAIN ═══ */}
-      <div className="aw-main">
+          {/* User menu */}
+          <div className="al-user-wrap" ref={menuRef}>
+            <button
+              className="al-user-btn"
+              onClick={() => setUserMenuOpen(p => !p)}
+            >
+              <div className="al-avatar">{getInitials(user?.name)}</div>
+              <div className="al-user-info">
+                <span className="al-user-name">{user?.name}</span>
+                <span className="al-user-role">Directeur</span>
+              </div>
+              <span className="al-chevron" style={{ transform: userMenuOpen ? "rotate(180deg)" : "none", transition: ".2s" }}>
+                {Icons.chevronDown}
+              </span>
+            </button>
 
-        {/* Topbar */}
-        <header className="aw-navbar">
-          <div className="aw-navbar-left">
-            <span className="aw-navbar-title">Espace Directeur</span>
-            {navStats && (
-              <div className="navbar-kpis">
-                <span className="kpi-pill kpi-avc">
-                  {Icons.avc}
-                  AVC {((navStats.avc_moyen_global || 0) * 100).toFixed(1)}%
-                </span>
-                <span className="kpi-pill kpi-mh">
-                  {Icons.check}
-                  {navStats.mh_realisee_totale?.toLocaleString()}h réalisées
-                </span>
-                <span className="kpi-pill kpi-rest">
-                  {Icons.clock}
-                  {navStats.mh_restante_totale?.toLocaleString()}h restantes
-                </span>
-                <span className="kpi-pill kpi-eff">
-                  {Icons.people}
-                  {navStats.effectif_total?.toLocaleString()} stagiaires
-                </span>
+            {userMenuOpen && (
+              <div className="al-user-menu">
+                <div className="al-user-menu-header">
+                  <div className="al-avatar al-avatar-lg">{getInitials(user?.name)}</div>
+                  <div>
+                    <div className="al-user-menu-name">{user?.name}</div>
+                    <div className="al-user-menu-email">{user?.email}</div>
+                  </div>
+                </div>
+                <div className="al-user-menu-divider" />
+                <button className="al-user-menu-item al-user-menu-logout" onClick={handleLogout}>
+                  {Icons.logout}
+                  Déconnexion
+                </button>
               </div>
             )}
           </div>
 
-          <div className="aw-navbar-right">
-            <div className="navbar-user-btn">
-              <div className="navbar-avatar">{getInitials(user?.name)}</div>
-              <div>
-                <div className="navbar-user-name">{user?.name}</div>
-                <div className="navbar-user-role">{user?.email}</div>
-              </div>
-              <span className="navbar-badge">Directeur</span>
-            </div>
-          </div>
-        </header>
+        </div>
+      </header>
 
-        <main className="aw-content">
-          <Outlet />
-        </main>
-      </div>
+      {/* ══════════════════════════════════════════
+          PAGE CONTENT
+      ══════════════════════════════════════════ */}
+      <main className="al-content">
+        <Outlet />
+      </main>
+
     </div>
   );
 }

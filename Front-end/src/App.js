@@ -14,6 +14,10 @@ import DirecteurModules      from "./pages/directeur/Modules";
 import DirecteurImport       from "./pages/directeur/ImportExcel";
 import SurveillantDashboard  from "./pages/surveillant/Dashboard";
 import FormateurDashboard    from "./pages/formateur/Dashboard";
+import DirecteurPole         from "./pages/directeur/Pole";
+import DirecteurAlertes      from "./pages/directeur/Alertes";
+
+
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
@@ -54,6 +58,10 @@ export default function App() {
             <Route path="groupes"      element={<DirecteurGroupes />} />
             <Route path="modules"      element={<DirecteurModules />} />
             <Route path="import"       element={<DirecteurImport />} />
+            <Route path="alertes"     element={<DirecteurAlertes />} />
+            <Route path="pole"        element={<DirecteurPole />} />
+
+
           </Route>
 
           {/* SURVEILLANT */}
