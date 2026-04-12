@@ -1,8 +1,4 @@
 <?php
-// ============================================================
-// database/migrations/xxxx_create_plannings_table.php
-// Commande: php artisan make:migration create_plannings_table
-// ============================================================
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -20,19 +16,21 @@ return new class extends Migration
                   ->constrained('users')
                   ->onDelete('cascade');
 
-            // groupe_id → table 'groupes' (déjà dans ton projet)
+            // groupe_id → table 'groupes'
             $table->foreignId('groupe_id')
                   ->constrained('groupes')
                   ->onDelete('cascade');
 
-            // module_id → table 'modules' (déjà dans ton projet)
+            // module_id → table 'modules'
             $table->foreignId('module_id')
                   ->constrained('modules')
                   ->onDelete('cascade');
 
-            // formateur_id → table 'users' (rôle formateur)
-            $table->foreignId('formateur_id')
-                  ->constrained('users')
+            // formateur_id → table 'formateurs' (pas users)
+            $table->unsignedBigInteger('formateur_id');
+            $table->foreign('formateur_id')
+                  ->references('id')
+                  ->on('formateurs')
                   ->onDelete('cascade');
 
             // Données pédagogiques
