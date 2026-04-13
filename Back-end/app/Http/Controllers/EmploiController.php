@@ -1,15 +1,12 @@
 <?php
 // ============================================================
-// app/Http/Controllers/EmploiController.php
-// NOUVEAU FICHIER — déjà importé dans ton api.php
-// Route::apiResource('emplois', EmploiController::class)
+// app/Http/Controllers/EmploiController.php  — VERSION CORRIGÉE
 // ============================================================
 
 namespace App\Http\Controllers;
 
 use App\Models\Planning;
 use App\Models\EmploiDuTemps;
-use App\Models\Groupe;
 use Illuminate\Http\Request;
 
 class EmploiController extends Controller
@@ -25,8 +22,8 @@ class EmploiController extends Controller
             ->get()
             ->map(fn($e) => [
                 'id'          => $e->id,
-                'groupe'      => $e->groupe->code ?? '—',
-                'periodeDebut'=> $e->periode_debut?->format('d/m/Y'),
+                'groupe'      => optional($e->groupe)->code ?? '—',
+                'periodeDebut'=> optional($e->periode_debut)?->format('d/m/Y'),
                 'valide'      => $e->valide,
             ]);
 
@@ -35,9 +32,7 @@ class EmploiController extends Controller
 
     /**
      * POST /api/emplois
-     * Body: { groupe: 'Dev 201', date_debut: '2026-03-30', semestre: 2 }
-     *
-     * Génère la grille jours/séances depuis les plannings existants
+     * Body: { groupe: 'Dev 201', date_debut: '2026-04-10', semestre: 2 }
      */
     public function store(Request $request)
     {
@@ -46,18 +41,28 @@ class EmploiController extends Controller
             'date_debut' => 'required|date',
         ]);
 
-        // Trouve le groupe
-        $groupe = Groupe::where('code', $request->groupe)->firstOrFail();
+        // Cherche le groupe par code
+        $groupe = \App\Models\Groupe::where('code', $request->groupe)->first();
 
-        // Récupère les plannings du groupe qui ont un jour/séance assigné
-        $plannings = Planning::with(['module', 'formateur'])
+        if (!$groupe) {
+            return response()->json([
+                'message' => "Groupe '{$request->groupe}' introuvable."
+            ], 404);
+        }
+
+        // Récupère les plannings du groupe avec un jour/séance assigné
+        $planningsQuery = Planning::with(['module', 'formateur'])
             ->where('groupe_id', $groupe->id)
-            ->whereNotNull('jour')
-            ->when($request->semestre, fn($q) => $q->where('semestre', $request->semestre))
-            ->get();
+            ->whereNotNull('jour');
+
+        if ($request->filled('semestre')) {
+            $planningsQuery->where('semestre', $request->semestre);
+        }
+
+        $plannings = $planningsQuery->get();
 
         // Construit la grille
-        $jours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+        $jours  = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
         $grille = [];
         foreach ($jours as $jour) {
             $grille[$jour] = [null, null, null, null];
@@ -65,27 +70,21 @@ class EmploiController extends Controller
 
         foreach ($plannings as $p) {
             $idx = ($p->seance_numero ?? 1) - 1;
-            if (isset($grille[$p->jour][$idx])) {
+            if ($idx >= 0 && $idx < 4 && isset($grille[$p->jour])) {
                 $grille[$p->jour][$idx] = [
-                    'module'    => $p->module->intitule ?? $p->module->nom ?? '—',
-                    'formateur' => $p->formateur->nom_complet ?? $p->formateur->name ?? '—',
+                    'module'    => optional($p->module)->intitule
+                                ?? optional($p->module)->nom
+                                ?? optional($p->module)->libelle ?? '—',
+                    'formateur' => optional($p->formateur)->name ?? '—',
                     'salle'     => $p->salle ?? 'TBD',
                     'mode'      => $p->mode ?? 'PRESENTIEL',
                 ];
             }
         }
 
-        // Optionnel: sauvegarde en base
-        // $emploi = EmploiDuTemps::create([
-        //     'groupe_id'    => $groupe->id,
-        //     'periode_debut'=> $request->date_debut,
-        //     'grille'       => $grille,
-        //     'created_by'   => $request->user()->id,
-        // ]);
-
         $response = [
             'groupe'      => $groupe->code,
-            'filiere'     => $groupe->filiere ?? '—',
+            'filiere'     => $groupe->filiere ?? $groupe->nom ?? '—',
             'efp'         => 'ISTA HAY SALAM SALE',
             'periodeDebut'=> \Carbon\Carbon::parse($request->date_debut)->format('d/m/Y'),
             'jours'       => $grille,
@@ -94,18 +93,12 @@ class EmploiController extends Controller
         return response()->json(['data' => $response], 201);
     }
 
-    /**
-     * GET /api/emplois/{id}
-     */
     public function show($id)
     {
         $emploi = EmploiDuTemps::with('groupe')->findOrFail($id);
         return response()->json(['data' => $emploi]);
     }
 
-    /**
-     * PUT /api/emplois/{id}
-     */
     public function update(Request $request, $id)
     {
         $emploi = EmploiDuTemps::findOrFail($id);
@@ -113,9 +106,6 @@ class EmploiController extends Controller
         return response()->json(['data' => $emploi]);
     }
 
-    /**
-     * DELETE /api/emplois/{id}
-     */
     public function destroy($id)
     {
         EmploiDuTemps::findOrFail($id)->delete();

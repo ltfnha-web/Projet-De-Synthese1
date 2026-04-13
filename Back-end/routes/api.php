@@ -1,8 +1,5 @@
 <?php
-// ============================================================
-// routes/api.php
-// FICHIER COMPLET — zbid ghir les lignes marquées ← AJOUT
-// ============================================================
+// routes/api.php — VERSION FINALE CORRIGÉE
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ImportController;
@@ -12,14 +9,13 @@ use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\PoleController;
 use App\Http\Controllers\AlerteController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\EmploiController;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 
-// ── Public ──
 Route::post('/login', [AuthController::class, 'login']);
 
-// ── Protégées ──
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -27,21 +23,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── DIRECTEUR ──
     Route::middleware('role:directeur')->group(function () {
-        Route::get('/stats',              [UserController::class, 'stats']);
-        Route::apiResource('users',       UserController::class);
-        Route::get('/formateurs',         [FormateurController::class, 'index']);
-        Route::post('/formateurs',        [FormateurController::class, 'store']);
+        Route::get('/stats',                     [UserController::class, 'stats']);
+        Route::apiResource('users',              UserController::class);
+        Route::get('/formateurs',                [FormateurController::class, 'index']);
+        Route::post('/formateurs',               [FormateurController::class, 'store']);
         Route::put('/formateurs/{formateur}',    [FormateurController::class, 'update']);
         Route::delete('/formateurs/{formateur}', [FormateurController::class, 'destroy']);
-        Route::get('/groupes',            [GroupeController::class, 'index']);
-        Route::get('/filieres-list',      [GroupeController::class, 'filieresList']);
-        Route::get('/modules-list',       [ModuleController::class, 'index']);
-        Route::post('/import/base-plate', [ImportController::class, 'import']);
-        Route::get('/pole',                   [PoleController::class, 'index']);
-        Route::get('/pole/{secteur}/groupes', [PoleController::class, 'groupesSecteur']);
-        Route::post('/pole/assign',           [PoleController::class, 'assign']);
-        Route::delete('/pole/{secteur}',      [PoleController::class, 'remove']);
-        Route::get('/alertes',            [AlerteController::class, 'index']);
+        Route::get('/groupes',                   [GroupeController::class, 'index']);
+        Route::get('/filieres-list',             [GroupeController::class, 'filieresList']);
+        Route::get('/modules-list',              [ModuleController::class, 'index']);
+        Route::post('/import/base-plate',        [ImportController::class, 'import']);
+        Route::get('/pole',                      [PoleController::class, 'index']);
+        Route::get('/pole/{secteur}/groupes',    [PoleController::class, 'groupesSecteur']);
+        Route::post('/pole/assign',              [PoleController::class, 'assign']);
+        Route::delete('/pole/{secteur}',         [PoleController::class, 'remove']);
+        Route::get('/alertes',                   [AlerteController::class, 'index']);
     });
 
     // ── SURVEILLANT ──
@@ -52,16 +48,52 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── FORMATEUR ──
     Route::middleware('role:formateur')->prefix('formateur')->group(function () {
-        Route::get('/seances',          fn() => response()->json(['page' => 'Séances']));
-        Route::get('/planning',         [FormateurController::class, 'planning']);   // ← AJOUT
-        Route::get('/emploi-du-temps',  [FormateurController::class, 'emploi']);     // ← AJOUT
+        Route::get('/seances',         fn() => response()->json(['page' => 'Séances']));
+        Route::get('/planning',        [FormateurController::class, 'planning']);
+        Route::get('/emploi-du-temps', [FormateurController::class, 'emploi']);
     });
-
-    Route::get('/emploi-temps/view', fn() => response()->json(['page' => 'Voir EDT']));
 
     // ── PÔLE ──
     Route::middleware('role:pole')->group(function () {
-        Route::apiResource('plannings', PlanningController::class);  // déjà dans ton fichier
-        Route::apiResource('emplois',   EmploiController::class);    // déjà dans ton fichier
+
+        Route::apiResource('plannings', PlanningController::class);
+        Route::apiResource('emplois',   EmploiController::class);
+
+        // Groupes — colonne "nom" comme code
+        Route::get('/pole-groupes', function () {
+            $groupes = DB::table('groupes')
+                ->select(
+                    'groupes.id',
+                    'groupes.nom',
+                    'groupes.annee_formation',
+                    DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere_nom")
+                )
+                ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+                ->orderBy('groupes.nom')
+                ->get();
+            return response()->json(['data' => $groupes]);
+        });
+
+        // Formateurs — users avec role=formateur
+       Route::get('/pole-formateurs', [FormateurController::class, 'index']);
+
+        // Modules filtrés par groupe_id
+        // semestre = "S1","S2"... | eg_et = "EG"(Régionale) ou "ET"(Locale)
+        Route::get('/pole-modules', function (\Illuminate\Http\Request $request) {
+            $query = DB::table('modules')
+                ->select('id', 'intitule', 'code', 'semestre', 'eg_et', 'is_regional',
+                         'mh_drif', 'mh_restante', 'formateur_id');
+
+            if ($request->filled('groupe_id')) {
+                $query->where('groupe_id', $request->groupe_id);
+            }
+            if ($request->filled('semestre')) {
+                $query->where('semestre', $request->semestre);
+            }
+
+            return response()->json(['data' => $query->orderBy('intitule')->get()]);
+        });
     });
+
+    Route::get('/emploi-temps/view', fn() => response()->json(['page' => 'Voir EDT']));
 });
