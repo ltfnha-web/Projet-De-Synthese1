@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// app/Models/User.php
+// MODIFICATION : zbid "pole" f fillable + helper isPole()
+// ============================================================
 
 namespace App\Models;
 
@@ -15,11 +19,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',
+        'role',        // directeur | surveillant | formateur | stagiaire | pole ← AJOUT
         'is_active',
-        'specialite',   // formateur uniquement
+        'specialite',
         'telephone',
-        'statut',       // actif | inactif
+        'statut',
     ];
 
     protected $hidden = [
@@ -32,8 +36,8 @@ class User extends Authenticatable
         'is_active' => 'boolean',
     ];
 
-    // Helpers rôle
+    // ── Helpers rôle ──
     public function isDirecteur():   bool { return $this->role === 'directeur'; }
-    public function isSurveillant(): bool { return $this->role === 'surveillant'; }
     public function isFormateur():   bool { return $this->role === 'formateur'; }
+    public function isPole():        bool { return $this->role === 'pole'; }        // ← AJOUT
 }
