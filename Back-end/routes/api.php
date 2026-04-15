@@ -25,10 +25,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:directeur')->group(function () {
         Route::get('/stats',                     [UserController::class, 'stats']);
         Route::apiResource('users',              UserController::class);
+
+        // ✅ /formateurs/all DOIT être en PREMIER avant {formateur}
+        Route::get('/formateurs/all',            [FormateurController::class, 'all']);
         Route::get('/formateurs',                [FormateurController::class, 'index']);
         Route::post('/formateurs',               [FormateurController::class, 'store']);
         Route::put('/formateurs/{formateur}',    [FormateurController::class, 'update']);
         Route::delete('/formateurs/{formateur}', [FormateurController::class, 'destroy']);
+
         Route::get('/groupes',                   [GroupeController::class, 'index']);
         Route::get('/filieres-list',             [GroupeController::class, 'filieresList']);
         Route::get('/modules-list',              [ModuleController::class, 'index']);

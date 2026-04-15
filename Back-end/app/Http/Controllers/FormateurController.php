@@ -8,6 +8,16 @@ use Illuminate\Http\Request;
 
 class FormateurController extends Controller
 {
+    // ✅ TOUS les formateurs sans pagination — pour alimenter les selects
+    public function all()
+    {
+        return response()->json(
+            Formateur::select('id', 'nom')
+                ->orderBy('nom')
+                ->get()
+        );
+    }
+
     public function index(Request $request)
     {
         $query = Formateur::query()
