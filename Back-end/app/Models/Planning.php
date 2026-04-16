@@ -3,9 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Formateur;
-use App\Models\Groupe;
-use App\Models\Module;
 
 class Planning extends Model
 {
@@ -38,51 +35,54 @@ class Planning extends Model
         'seance_numero'   => 'integer',
     ];
 
-    /*
-    |---------------------------------------
-    | RELATIONS
-    |---------------------------------------
-    */
+    // ── Relations ──────────────────────────────────────────
 
-    // Planning belongs to Groupe
     public function groupe()
     {
         return $this->belongsTo(Groupe::class);
     }
 
-    // Planning belongs to Module
     public function module()
     {
         return $this->belongsTo(Module::class);
     }
 
-    // 🔥 IMPORTANT: formateur comes from FORMATEURS table (NOT users)
     public function formateur()
     {
         return $this->belongsTo(Formateur::class, 'formateur_id');
     }
 
-    /*
-    |---------------------------------------
-    | ACCESSORS (HELPERS)
-    |---------------------------------------
-    */
-
-    // Remaining hours
-    public function getMhRestantAttribute(): int
+    public function semaines()
     {
-        return ($this->mh_drif ?? 0) - ($this->mh_realisee ?? 0);
+        return $this->hasMany(PlanningSemaine::class)->orderBy('semaine_num');
     }
 
-    // Progress %
+    // ── Accessors ──────────────────────────────────────────
+
+    /**
+     * MH totale prévue = somme des cases semaines
+     * (Si aucune semaine, fallback sur mh_drif)
+     */
+    public function getMhPrevueTotaleAttribute(): float
+    {
+        return $this->semaines->sum('mh_prevue');
+    }
+
+    /**
+     * MH restante = mh_drif - total prévu dans les semaines
+     */
+    public function getMhRestanteAttribute(): float
+    {
+        $totalPrevu = $this->semaines->sum('mh_prevue');
+        return max(0, ($this->mh_drif ?? 0) - $totalPrevu);
+    }
+
+    /**
+     * Avancement % basé sur mh_realisee / mh_drif
+     */
     public function getAvancementAttribute(): int
     {
-        if (!$this->mh_drif || $this->mh_drif == 0) {
-            return 0;
-        }
-
-        return (int) round(
-            ($this->mh_realisee / $this->mh_drif) * 100
-        );
+        if (!$this->mh_drif || $this->mh_drif == 0) return 0;
+        return (int) round(($this->mh_realisee / $this->mh_drif) * 100);
     }
 }

@@ -53,12 +53,13 @@ export default function Pole() {
 
   useEffect(() => { fetchSecteurs(); }, [fetchSecteurs]);
 
-  // Fetch formateurs pour le select
-  useEffect(() => {
-    axios.get("/formateurs", { params: { statut: "actif" } })
-      .then(r => setFormateurs(r.data.data || r.data))
-      .catch(() => {});
-  }, []);
+  // Fetch formateurs pour le select — sans filtre statut pour tout récupérer
+useEffect(() => {
+    axios.get("/formateurs/all")  
+      .then(r => {
+        setFormateurs(Array.isArray(r.data) ? r.data : []);
+      })
+}, []);
 
   // Fetch groupes d'un secteur
   const fetchGroupes = useCallback((secteurId) => {
@@ -112,10 +113,13 @@ export default function Pole() {
     return "#ef4444";
   };
 
-  const filtered = secteurs.filter(s =>
-    (!search || s.nom.toLowerCase().includes(search.toLowerCase())) &&
-    (!filterFormateur || s.responsable?.id == filterFormateur)
-  );
+  // Fix filtre __none__ (sans responsable)
+  const filtered = secteurs.filter(s => {
+    if (search && !s.nom.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterFormateur === "__none__") return !s.responsable;
+    if (filterFormateur) return s.responsable?.id == filterFormateur;
+    return true;
+  });
 
   return (
     <div>
@@ -160,69 +164,72 @@ export default function Pole() {
         </div>
 
         {/* ── TABLE SECTEURS ── */}
-        {loading ? <div className="loader"><div className="loader-spinner" /><span>Chargement...</span></div>
-        : filtered.length === 0 ? (
+        {loading ? (
+          <div className="loader"><div className="loader-spinner" /><span>Chargement...</span></div>
+        ) : filtered.length === 0 ? (
           <div className="empty"><div className="empty-icon">{Icons.map}</div><div className="empty-title">Aucun secteur</div></div>
         ) : (
-          <table id="table-pole">
-            <thead>
-              <tr>
-                <th>#</th><th>Secteur</th><th>Filières</th><th>Groupes</th>
-                <th>Critiques</th><th>AVC Moyen</th><th>MH Restante</th>
-                <th>Responsable</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s, i) => (
-                <tr key={s.id}
-                  style={{ cursor: "pointer", background: selectedSecteur?.id === s.id ? "var(--p0)" : undefined }}
-                  onClick={() => setSelectedSecteur(s)}
-                >
-                  <td style={{ color: "var(--sl4)" }}>{i + 1}</td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: avcColor(s.avc_moyen * 100), flexShrink: 0 }} />
-                      <strong style={{ color: "var(--sl8)" }}>{s.nom}</strong>
-                    </div>
-                  </td>
-                  <td><span className="badge badge-neutral">{s.nb_filieres}</span></td>
-                  <td><span className="badge badge-info">{s.nb_groupes}</span></td>
-                  <td>
-                    {s.groupes_critiques > 0
-                      ? <span className="badge badge-red">{s.groupes_critiques} critiques</span>
-                      : <span className="badge badge-ok">Aucun</span>
-                    }
-                  </td>
-                  <td><AvcBar value={s.avc_moyen} /></td>
-                  <td style={{ fontVariantNumeric: "tabular-nums", fontSize: 13 }}>
-                    {s.mh_restante > 0
-                      ? <span style={{ color: "#ef4444", fontWeight: 600 }}>{s.mh_restante?.toLocaleString()}h</span>
-                      : <span style={{ color: "#10b981" }}>—</span>
-                    }
-                  </td>
-                  <td>
-                    {s.responsable
-                      ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--p0)", border: "1px solid var(--p2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--p6)", flexShrink: 0 }}>
-                            {s.responsable.nom?.split(" ").map(w => w[0]).join("").slice(0, 2)}
-                          </div>
-                          <span style={{ fontSize: 13, color: "var(--sl7)" }}>{s.responsable.nom}</span>
-                        </div>
-                      )
-                      : <span style={{ fontSize: 12, color: "var(--sl4)", fontStyle: "italic" }}>Non assigné</span>
-                    }
-                  </td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <button className="btn-icon btn-icon-edit" title="Assigner responsable" onClick={() => openAssign(s)}>{Icons.star}</button>
-                    {s.responsable && (
-                      <button className="btn-icon btn-icon-del" title="Retirer responsable" onClick={() => removeResponsable(s.id)}>{Icons.trash}</button>
-                    )}
-                  </td>
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table id="table-pole" style={{ minWidth: 820 }}>
+              <thead>
+                <tr>
+                  <th>#</th><th>Secteur</th><th>Filières</th><th>Groupes</th>
+                  <th>Critiques</th><th>AVC Moyen</th><th>MH Restante</th>
+                  <th>Responsable</th><th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((s, i) => (
+                  <tr key={s.id}
+                    style={{ cursor: "pointer", background: selectedSecteur?.id === s.id ? "var(--p0)" : undefined }}
+                    onClick={() => setSelectedSecteur(s)}
+                  >
+                    <td style={{ color: "var(--sl4)" }}>{i + 1}</td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: avcColor(s.avc_moyen * 100), flexShrink: 0 }} />
+                        <strong style={{ color: "var(--sl8)" }}>{s.nom}</strong>
+                      </div>
+                    </td>
+                    <td><span className="badge badge-neutral">{s.nb_filieres}</span></td>
+                    <td><span className="badge badge-info">{s.nb_groupes}</span></td>
+                    <td>
+                      {s.groupes_critiques > 0
+                        ? <span className="badge badge-red">{s.groupes_critiques} critiques</span>
+                        : <span className="badge badge-ok">Aucun</span>
+                      }
+                    </td>
+                    <td><AvcBar value={s.avc_moyen} /></td>
+                    <td style={{ fontVariantNumeric: "tabular-nums", fontSize: 13 }}>
+                      {s.mh_restante > 0
+                        ? <span style={{ color: "#ef4444", fontWeight: 600 }}>{s.mh_restante?.toLocaleString()}h</span>
+                        : <span style={{ color: "#10b981" }}>—</span>
+                      }
+                    </td>
+                    <td>
+                      {s.responsable
+                        ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--p0)", border: "1px solid var(--p2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--p6)", flexShrink: 0 }}>
+                              {s.responsable.nom?.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                            </div>
+                            <span style={{ fontSize: 13, color: "var(--sl7)" }}>{s.responsable.nom}</span>
+                          </div>
+                        )
+                        : <span style={{ fontSize: 12, color: "var(--sl4)", fontStyle: "italic" }}>Non assigné</span>
+                      }
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button className="btn-icon btn-icon-edit" title="Assigner responsable" onClick={() => openAssign(s)}>{Icons.star}</button>
+                      {s.responsable && (
+                        <button className="btn-icon btn-icon-del" title="Retirer responsable" onClick={() => removeResponsable(s.id)}>{Icons.trash}</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -259,36 +266,40 @@ export default function Pole() {
             </div>
           </div>
 
-          {groupesLoading ? <div className="loader"><div className="loader-spinner" /></div>
-          : groupes.length === 0 ? <div className="empty"><div className="empty-icon">{Icons.groups}</div><div className="empty-title">Aucun groupe</div></div>
-          : (
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th><th>Groupe</th><th>Filière</th><th>Année</th>
-                  <th>Effectif</th><th>Mode</th><th>MH DRIF</th>
-                  <th>MH Réalisée</th><th>Restante</th><th>AVC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupes.map((g, i) => (
-                  <tr key={g.id}>
-                    <td style={{ color: "var(--sl4)" }}>{i + 1}</td>
-                    <td><strong>{g.nom}</strong></td>
-                    <td style={{ fontSize: 12, color: "var(--sl6)" }}>{g.filiere_nom}</td>
-                    <td><span className="badge badge-info">Année {g.annee_formation}</span></td>
-                    <td><strong>{g.effectif}</strong></td>
-                    <td style={{ fontSize: 12 }}>{g.mode || "—"}</td>
-                    <td style={{ fontVariantNumeric: "tabular-nums" }}>{g.mh_drif}h</td>
-                    <td style={{ fontVariantNumeric: "tabular-nums", color: "#10b981", fontWeight: 600 }}>{g.mh_realisee}h</td>
-                    <td style={{ fontVariantNumeric: "tabular-nums", color: g.mh_restante > 0 ? "#ef4444" : "var(--sl4)", fontWeight: g.mh_restante > 0 ? 600 : 400 }}>
-                      {g.mh_restante > 0 ? g.mh_restante + "h" : "—"}
-                    </td>
-                    <td><AvcBar value={g.avc_moyen} /></td>
+          {groupesLoading ? (
+            <div className="loader"><div className="loader-spinner" /></div>
+          ) : groupes.length === 0 ? (
+            <div className="empty"><div className="empty-icon">{Icons.groups}</div><div className="empty-title">Aucun groupe</div></div>
+          ) : (
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table style={{ minWidth: 780 }}>
+                <thead>
+                  <tr>
+                    <th>#</th><th>Groupe</th><th>Filière</th><th>Année</th>
+                    <th>Effectif</th><th>Mode</th><th>MH DRIF</th>
+                    <th>MH Réalisée</th><th>Restante</th><th>AVC</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {groupes.map((g, i) => (
+                    <tr key={g.id}>
+                      <td style={{ color: "var(--sl4)" }}>{i + 1}</td>
+                      <td><strong>{g.nom}</strong></td>
+                      <td style={{ fontSize: 12, color: "var(--sl6)" }}>{g.filiere_nom}</td>
+                      <td><span className="badge badge-info">Année {g.annee_formation}</span></td>
+                      <td><strong>{g.effectif}</strong></td>
+                      <td style={{ fontSize: 12 }}>{g.mode || "—"}</td>
+                      <td style={{ fontVariantNumeric: "tabular-nums" }}>{g.mh_drif}h</td>
+                      <td style={{ fontVariantNumeric: "tabular-nums", color: "#10b981", fontWeight: 600 }}>{g.mh_realisee}h</td>
+                      <td style={{ fontVariantNumeric: "tabular-nums", color: g.mh_restante > 0 ? "#ef4444" : "var(--sl4)", fontWeight: g.mh_restante > 0 ? 600 : 400 }}>
+                        {g.mh_restante > 0 ? g.mh_restante + "h" : "—"}
+                      </td>
+                      <td><AvcBar value={g.avc_moyen} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
