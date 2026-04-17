@@ -1,6 +1,18 @@
-// src/pages/pole/Emplois.jsx
 import { useState, useEffect } from "react";
 import axios from "axios";
+
+// Helper pour afficher proprement une chaîne ou un objet
+function toStr(value) {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    if (value.intitule) return toStr(value.intitule);
+    if (value.code) return toStr(value.code);
+    if (value.nom) return toStr(value.nom);
+    if (value.label) return toStr(value.label);
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
 
 const SEANCES = [
   { label: "Séance 1", horaire: "08:30 → 11:00" },
@@ -36,9 +48,9 @@ function SeanceCell({ s }) {
   );
   return (
     <td style={{ padding: "10px 14px", verticalAlign: "top", border: "1px solid var(--border)" }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--sl8)", marginBottom: 3 }}>{s.module}</div>
-      <div style={{ fontSize: 11, fontWeight: 500, color: getColor(s.formateur), marginBottom: 2 }}>{s.formateur}</div>
-      <div style={{ fontSize: 10, color: "var(--sl4)" }}>{s.salle}{s.salle && s.mode ? " · " : ""}{s.mode}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--sl8)", marginBottom: 3 }}>{toStr(s.module)}</div>
+      <div style={{ fontSize: 11, fontWeight: 500, color: getColor(toStr(s.formateur)), marginBottom: 2 }}>{toStr(s.formateur)}</div>
+      <div style={{ fontSize: 10, color: "var(--sl4)" }}>{toStr(s.salle)}{s.salle && s.mode ? " · " : ""}{toStr(s.mode)}</div>
     </td>
   );
 }
@@ -118,7 +130,7 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
     try {
       const groupe = groupes.find(g => String(g.id) === String(form.groupe_id));
       await axios.post("/emplois", {
-        groupe:     groupe?.nom ?? `Groupe ${form.groupe_id}`,
+        groupe:     toStr(groupe?.nom ?? `Groupe ${form.groupe_id}`),
         groupe_id:  Number(form.groupe_id),
         date_debut: form.date_debut,
         semestre:   form.semestre,
@@ -148,7 +160,6 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
         boxShadow: "0 20px 48px rgba(26,82,118,.18), 0 0 0 1px rgba(26,82,118,.08)",
         animation: "slideUp .2s ease",
       }}>
-        {/* Header */}
         <div style={{
           background: "var(--p6)", padding: "16px 24px",
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -174,7 +185,6 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
             </div>
           )}
 
-          {/* Infos générales */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 22 }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Groupe *</label>
@@ -182,7 +192,7 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
                 <option value="">Sélectionner un groupe</option>
                 {groupes.map(g => (
                   <option key={g.id} value={g.id}>
-                    {g.nom ?? `Groupe ${g.id}`}{g.filiere ? ` — ${g.filiere}` : ""}
+                    {toStr(g.nom ?? `Groupe ${g.id}`)}{g.filiere ? ` — ${toStr(g.filiere)}` : ""}
                   </option>
                 ))}
               </select>
@@ -200,7 +210,6 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
             </div>
           </div>
 
-          {/* Titre grille */}
           <div style={{
             fontSize: 11, fontWeight: 700, color: "var(--sl5)",
             textTransform: "uppercase", letterSpacing: ".6px",
@@ -209,7 +218,6 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
             {Ico.cal} Grille horaire — cliquer sur + pour ajouter une séance
           </div>
 
-          {/* Grille */}
           <div style={{ overflowX: "auto", marginBottom: 20 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720, fontSize: 12 }}>
               <thead>
@@ -255,27 +263,24 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
                                 color: "var(--rd5)", cursor: "pointer", width: 18, height: 18,
                                 fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center",
                               }}>×</button>
-
                               <select style={{ ...inpSt, marginBottom: 5 }}
                                 value={cell.module}
                                 onChange={e => setCell(jour, si, "module", e.target.value)}>
                                 <option value="">Module…</option>
                                 {modules.map(m => (
-                                  <option key={m.id} value={m.intitule ?? m.code}>
-                                    {m.intitule ?? m.code}
+                                  <option key={m.id} value={toStr(m.intitule ?? m.code)}>
+                                    {toStr(m.intitule ?? m.code)}
                                   </option>
                                 ))}
                               </select>
-
                               <select style={{ ...inpSt, marginBottom: 5 }}
                                 value={cell.formateur}
                                 onChange={e => setCell(jour, si, "formateur", e.target.value)}>
                                 <option value="">Formateur…</option>
                                 {formateurs.map(f => (
-                                  <option key={f.id} value={f.nom}>{f.nom}</option>
+                                  <option key={f.id} value={toStr(f.nom)}>{toStr(f.nom)}</option>
                                 ))}
                               </select>
-
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
                                 <input type="text" style={inpSt}
                                   placeholder="Salle" value={cell.salle}
@@ -382,7 +387,6 @@ export default function Emplois() {
 
   return (
     <div>
-      {/* EN-TÊTE */}
       <div className="pg-header">
         <div className="pg-header-left">
           <div className="pg-title">Emplois du temps</div>
@@ -397,14 +401,12 @@ export default function Emplois() {
         </div>
       </div>
 
-      {/* ALERTE */}
       {alert && (
         <div className={`al-alert al-alert-${alert.type}`}>
           {alert.type === "ok" ? Ico.check : Ico.alert} {alert.msg}
         </div>
       )}
 
-      {/* MODAL */}
       {showModal && (
         <ModalCreerEmploi
           onClose={() => setModal(false)}
@@ -413,12 +415,10 @@ export default function Emplois() {
         />
       )}
 
-      {/* LOADER */}
       {loading && (
         <div className="loader"><div className="loader-spinner" /><span>Chargement…</span></div>
       )}
 
-      {/* CARTES EMPLOIS */}
       {!loading && emplois.length > 0 && (
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
@@ -438,7 +438,7 @@ export default function Emplois() {
               data-id={e.id}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--sl8)" }}>{e.groupe}</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--sl8)" }}>{toStr(e.groupe)}</div>
                 <button
                   className="btn-icon btn-icon-del"
                   style={{ width: 24, height: 24, flexShrink: 0 }}
@@ -451,7 +451,7 @@ export default function Emplois() {
                 </button>
               </div>
               <div style={{ fontSize: 11, color: "var(--sl5)", marginTop: 5 }}>
-                {Ico.cal} <span style={{ marginLeft: 4 }}>{e.periodeDebut ?? e.periode_debut ?? "—"}</span>
+                {Ico.cal} <span style={{ marginLeft: 4 }}>{toStr(e.periodeDebut ?? e.periode_debut ?? "—")}</span>
               </div>
               <div style={{ marginTop: 10 }}>
                 <span className={`badge ${e.valide ? "badge-ok" : "badge-warn"}`}>
@@ -468,7 +468,6 @@ export default function Emplois() {
         </div>
       )}
 
-      {/* EMPTY */}
       {!loading && emplois.length === 0 && !emploiActif && (
         <div className="table-card">
           <div className="empty">
@@ -482,20 +481,18 @@ export default function Emplois() {
         </div>
       )}
 
-      {/* AFFICHAGE EMPLOI ACTIF */}
       {emploiActif && (
         <div className="table-card" style={{ padding: 0 }}>
-          {/* Header emploi */}
           <div style={{
             background: "var(--p6)", padding: "14px 20px",
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <div>
               <div style={{ color: "white", fontWeight: 700, fontSize: 14, fontFamily: "var(--font-hd)" }}>
-                EMPLOI DU TEMPS — {emploiActif.efp ?? "ISTA HAY SALAM SALE"}
+                EMPLOI DU TEMPS — {toStr(emploiActif.efp ?? "ISTA HAY SALAM SALE")}
               </div>
               <div style={{ color: "rgba(255,255,255,.6)", fontSize: 11, marginTop: 2 }}>
-                Année 2025-2026 · Période : {emploiActif.periodeDebut ?? emploiActif.periode_debut ?? "—"}
+                Année 2025-2026 · Période : {toStr(emploiActif.periodeDebut ?? emploiActif.periode_debut ?? "—")}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -510,7 +507,6 @@ export default function Emplois() {
             </div>
           </div>
 
-          {/* Barre infos */}
           <div style={{
             background: "var(--sl0)", padding: "8px 20px",
             fontSize: 12, color: "var(--sl6)",
@@ -518,8 +514,8 @@ export default function Emplois() {
             display: "flex", gap: 16,
           }}>
             <span>EFP : <strong>ISTA HAY SALAM SALE</strong></span>
-            <span>Filière : <strong>{emploiActif.filiere ?? "—"}</strong></span>
-            <span>Groupe : <strong style={{ color: "var(--p6)" }}>{emploiActif.groupe}</strong></span>
+            <span>Filière : <strong>{toStr(emploiActif.filiere ?? "—")}</strong></span>
+            <span>Groupe : <strong style={{ color: "var(--p6)" }}>{toStr(emploiActif.groupe)}</strong></span>
             {emploiActif.semestre && (
               <span className={`badge ${emploiActif.semestre === "S1" ? "badge-info" : "badge-purple"}`}>
                 {emploiActif.semestre}
@@ -527,7 +523,6 @@ export default function Emplois() {
             )}
           </div>
 
-          {/* Table grille */}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
@@ -567,13 +562,12 @@ export default function Emplois() {
             </table>
           </div>
 
-          {/* Footer */}
           <div style={{
             padding: "10px 20px", background: "var(--sl0)", borderTop: "1px solid var(--border)",
             display: "flex", justifyContent: "space-between",
             fontSize: 11, color: "var(--sl5)",
           }}>
-            <span>Le Directeur · Fait à Salé · Date : {emploiActif.periodeDebut ?? emploiActif.periode_debut}</span>
+            <span>Le Directeur · Fait à Salé · Date : {toStr(emploiActif.periodeDebut ?? emploiActif.periode_debut)}</span>
             <span>ISTA HAY SALAM SALE</span>
           </div>
         </div>

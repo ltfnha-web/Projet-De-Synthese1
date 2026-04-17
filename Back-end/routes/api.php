@@ -8,7 +8,7 @@ use App\Http\Controllers\FormateurController;
 use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\PoleController;
-use App\Http\Controllers\AlerteController;
+use App\Http\Controllers\AlerteController; 
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\EmploiController;
 use Illuminate\Support\Facades\Route;
@@ -62,10 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
    Route::middleware('role:pole')->group(function () {
 
-    // ── PLANNINGS ──
-    Route::get('/plannings',                              [PlanningController::class, 'index']);
-    Route::post('/plannings',                             [PlanningController::class, 'store']);
-    Route::delete('/plannings/{planning}',                [PlanningController::class, 'destroy']);
+    // // ── PLANNINGS ──
+    // Route::get('/plannings',                              [PlanningController::class, 'index']);
+    // Route::post('/plannings',                             [PlanningController::class, 'store']);
+    // Route::delete('/plannings/{planning}',                [PlanningController::class, 'destroy']);
 
     // Modifier une case semaine
     Route::put('/plannings/{planning}/semaine',           [PlanningController::class, 'updateSemaine']);
@@ -74,8 +74,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/plannings/{planning}/auto-distribuer',  [PlanningController::class, 'autoDistribuerRoute']);
 
     // Emplois du temps
-    Route::apiResource('emplois', EmploiController::class);
 
+ 
+// Emplois du temps
+Route::prefix('emplois')->group(function () {
+    Route::get('/',                         [EmploiController::class, 'index']);
+    Route::post('/',                        [EmploiController::class, 'store']);
+    Route::post('/generate-from-plannings', [EmploiController::class, 'generateFromPlannings']); // ← NOUVEAU
+    Route::get('/{id}',                     [EmploiController::class, 'show']);
+    Route::put('/{id}',                     [EmploiController::class, 'update']);
+    Route::delete('/{id}',                  [EmploiController::class, 'destroy']);
+});
+ 
+// Plannings
+Route::prefix('plannings')->group(function () {
+    Route::get('/',                          [PlanningController::class, 'index']);
+    Route::post('/',                         [PlanningController::class, 'store']);
+    Route::put('/{planning}',               [PlanningController::class, 'update']);
+    Route::delete('/{planning}',            [PlanningController::class, 'destroy']);
+    Route::put('/{planning}/semaine',       [PlanningController::class, 'updateSemaine']);
+    Route::post('/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
+});
     // Groupes pour le modal planning
     Route::get('/pole-groupes', function () {
         $groupes = DB::table('groupes')
