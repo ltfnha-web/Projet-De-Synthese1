@@ -97,144 +97,266 @@ class UserController extends Controller
 
     /**
      * GET /api/stats
-     * Stats complètes issues du fichier Excel importé
+     * Params optionnels :
+     *   ?secteur_id=1
+     *   ?creneau=CDJ|CDS
+     *   ?annee=1|2|3
+     *   ?seuil=critique|risque   (critique = AVC<30%, risque = AVC<50%)
      */
-    public function stats()
+    public function stats(Request $request)
     {
-        // ── Compteurs de base ──
-        $totalFormateurs  = Formateur::count();
-        $totalGroupes     = Groupe::count();
-        $totalModules     = Module::count();
-        $totalFilieres    = Filiere::count();
-        $totalSecteurs    = Secteur::count();
+        // ══════════════════════════════════════════
+        //  HELPERS — scope commun appliqué partout
+        // ══════════════════════════════════════════
+        $secteurId = $request->secteur_id;
+        $creneau   = $request->creneau;        // CDJ | CDS | null
+        $annee     = $request->annee;           // 1 | 2 | 3 | null
+        $seuil     = $request->seuil;           // critique | risque | null
 
-        // ── Users système ──
-        $totalSurveillants = User::where('role', 'surveillant')->count();
+        // Closure réutilisable pour appliquer les filtres sur modules+groupes
+        $applyFilters = function ($query) use ($secteurId, $creneau, $annee) {
+            if ($secteurId) {
+                $query->where('filieres.secteur_id', $secteurId);
+            }
+            if ($creneau) {
+                $query->where('groupes.creneau', $creneau);
+            }
+            if ($annee) {
+                $query->where('groupes.annee_formation', $annee);
+            }
+            return $query;
+        };
 
-        // ── MH globales ──
-        $mhRealisee = Module::sum('mh_realisee_globale');
-        $mhDrif     = Module::sum('mh_drif');
-        $mhRestante = Module::sum('mh_restante');
-
-        // ── AVC moyen global ──
-        $avcMoyen = $mhDrif > 0 ? $mhRealisee / $mhDrif : 0;
-
-        // ── Effectif total ──
-        $effectifTotal = Groupe::sum('effectif');
-
-        // ── AVC par secteur ──
-        $avcParSecteur = DB::table('modules')
+        // Base query modules → groupes → filieres → secteurs
+        $baseQuery = fn() => DB::table('modules')
             ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
-            ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id')
+            ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id');
+
+        // ══════════════════════════════════════════
+        //  COMPTEURS (filtrés)
+        // ══════════════════════════════════════════
+        $groupeScope = Groupe::join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+            ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
+            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee));
+
+        $moduleScope = Module::join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
+            ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+            ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
+            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee));
+
+        // Si pas de filtre → compteurs globaux rapides
+        $totalFormateurs   = Formateur::count();
+        $totalSurveillants = User::where('role', 'surveillant')->count();
+        $totalFilieres     = $secteurId
+            ? Filiere::where('secteur_id', $secteurId)->count()
+            : Filiere::count();
+        $totalSecteurs     = Secteur::count();
+
+        $totalGroupes  = (clone $groupeScope)->count('groupes.id');
+        $totalModules  = (clone $moduleScope)->count('modules.id');
+        $effectifTotal = (clone $groupeScope)->sum('groupes.effectif');
+
+        // ── MH globales (filtrées) ──
+        $mhRealisee = (clone $moduleScope)->sum('modules.mh_realisee_globale');
+        $mhDrif     = (clone $moduleScope)->sum('modules.mh_drif');
+        $mhRestante = (clone $moduleScope)->sum('modules.mh_restante');
+        $avcMoyen   = $mhDrif > 0 ? $mhRealisee / $mhDrif : 0;
+
+        // ══════════════════════════════════════════
+        //  AVC PAR SECTEUR (filtré)
+        // ══════════════════════════════════════════
+        $avcParSecteurQ = $applyFilters($baseQuery()
             ->select(
+                'secteurs.id as secteur_id',
                 'secteurs.nom as secteur',
                 DB::raw('SUM(modules.mh_realisee_globale) as mh_realisee'),
                 DB::raw('SUM(modules.mh_drif) as mh_drif'),
-                DB::raw('CASE WHEN SUM(modules.mh_drif) > 0 THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif) ELSE 0 END as avc_moyen')
+                DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
+                         THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif)
+                         ELSE 0 END as avc_moyen')
             )
-            ->groupBy('secteurs.nom')
-            ->orderByDesc('avc_moyen')
-            ->get();
+            ->groupBy('secteurs.id', 'secteurs.nom')
+        );
 
-        // ── Distribution groupes par tranche AVC ──
-        $groupesAvc = DB::table('modules')
-            ->join('groupes', 'modules.groupe_id', '=', 'groupes.id')
+        // Filtre seuil AVC sur les secteurs
+        if ($seuil === 'critique') {
+            $avcParSecteurQ->havingRaw('avc_moyen < 0.30');
+        } elseif ($seuil === 'risque') {
+            $avcParSecteurQ->havingRaw('avc_moyen < 0.50');
+        }
+
+        $avcParSecteur = $avcParSecteurQ->orderByDesc('avc_moyen')->get();
+
+        // ══════════════════════════════════════════
+        //  DISTRIBUTION GROUPES (filtrée)
+        // ══════════════════════════════════════════
+        $groupesAvc = $applyFilters($baseQuery()
             ->select(
                 'groupes.id',
-                DB::raw('CASE WHEN SUM(modules.mh_drif) > 0 THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif) ELSE 0 END as avc')
+                DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
+                         THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif)
+                         ELSE 0 END as avc')
             )
             ->groupBy('groupes.id')
-            ->get();
+        )->get();
 
         $distribution = ['critique' => 0, 'faible' => 0, 'moyen' => 0, 'bon' => 0, 'depasse' => 0];
         foreach ($groupesAvc as $g) {
             $v = $g->avc * 100;
-            if ($v >= 100)     $distribution['depasse']++;
-            elseif ($v >= 70)  $distribution['bon']++;
-            elseif ($v >= 50)  $distribution['moyen']++;
-            elseif ($v >= 30)  $distribution['faible']++;
-            else               $distribution['critique']++;
+            if ($seuil === 'critique' && $v >= 30) continue;
+            if ($seuil === 'risque'   && $v >= 50) continue;
+            if ($v >= 100)    $distribution['depasse']++;
+            elseif ($v >= 70) $distribution['bon']++;
+            elseif ($v >= 50) $distribution['moyen']++;
+            elseif ($v >= 30) $distribution['faible']++;
+            else              $distribution['critique']++;
         }
 
-        // ── MH DRIF vs Réalisée par filière (top 10) ──
-        $mhParFiliere = DB::table('modules')
-            ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
-            ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+        // ══════════════════════════════════════════
+        //  MH PAR FILIÈRE (filtrée, top 10)
+        // ══════════════════════════════════════════
+        $mhParFiliereQ = $applyFilters($baseQuery()
             ->select(
                 'filieres.intitule as filiere',
                 DB::raw('SUM(modules.mh_drif) as mh_drif'),
-                DB::raw('SUM(modules.mh_realisee_globale) as mh_realisee')
+                DB::raw('SUM(modules.mh_realisee_globale) as mh_realisee'),
+                DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
+                         THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif)
+                         ELSE 0 END as avc_filiere')
             )
             ->groupBy('filieres.intitule')
-            ->orderByDesc('mh_drif')
-            ->limit(10)
+        );
+
+        if ($seuil === 'critique') {
+            $mhParFiliereQ->havingRaw('avc_filiere < 0.30');
+        } elseif ($seuil === 'risque') {
+            $mhParFiliereQ->havingRaw('avc_filiere < 0.50');
+        }
+
+        $mhParFiliere = $mhParFiliereQ->orderByDesc('mh_drif')->limit(10)->get();
+
+        // ══════════════════════════════════════════
+        //  GROUPES PAR NIVEAU (filtré)
+        // ══════════════════════════════════════════
+        $groupesParNiveau = Groupe::select(
+                'groupes.annee_formation as annee',
+                DB::raw('count(*) as total')
+            )
+            ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+            ->whereNotNull('groupes.annee_formation')
+            ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
+            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->groupBy('groupes.annee_formation')
+            ->orderBy('groupes.annee_formation')
             ->get();
 
-        // ── Groupes par année de formation ──
-        $groupesParNiveau = Groupe::select('annee_formation as annee', DB::raw('count(*) as total'))
-            ->whereNotNull('annee_formation')
-            ->groupBy('annee_formation')
-            ->orderBy('annee_formation')
-            ->get();
-
+        // ══════════════════════════════════════════
+        //  ALERTES COUNT (toujours global pour navbar)
+        // ══════════════════════════════════════════
         $groupesData = DB::table('modules')
-    ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
-    ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
-    ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id')
-    ->select(
-        'groupes.id as groupe_id',
-        DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
-                 THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif)
-                 ELSE 0 END as avc'),
-        DB::raw('SUM(CASE WHEN modules.seance_efm = "Oui" THEN 1 ELSE 0 END) as has_efm'),
-        DB::raw('SUM(CASE WHEN modules.mh_realisee_globale = 0 THEN 1 ELSE 0 END) as modules_non_demarres'),
-        DB::raw('COUNT(modules.id) as total_modules')
-    )
-    ->groupBy('groupes.id')
-    ->get();
+            ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
+            ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+            ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id')
+            ->select(
+                'groupes.id as groupe_id',
+                DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
+                         THEN SUM(modules.mh_realisee_globale) / SUM(modules.mh_drif)
+                         ELSE 0 END as avc'),
+                DB::raw('SUM(CASE WHEN modules.seance_efm = "Oui" THEN 1 ELSE 0 END) as has_efm'),
+                DB::raw('SUM(CASE WHEN modules.mh_realisee_globale = 0 THEN 1 ELSE 0 END) as modules_non_demarres'),
+                DB::raw('COUNT(modules.id) as total_modules')
+            )
+            ->groupBy('groupes.id')
+            ->get();
 
-    $alertesCount = 0;
-foreach ($groupesData as $g) {
-    // 1. AVC CRITIQUE < 30%
-    if ($g->avc < 0.30) {
-        $alertesCount++;
-    }
-    // 2. EFM prévu + AVC entre 30% et 50%
-    if ($g->has_efm > 0 && $g->avc >= 0.30 && $g->avc < 0.50) {
-        $alertesCount++;
-    }
-    // 3. AVC FAIBLE 30–50% sans EFM
-    if ($g->avc >= 0.30 && $g->avc < 0.50 && $g->has_efm == 0) {
-        $alertesCount++;
-    }
-    // 4. Modules non démarrés > 20%
-    if ($g->total_modules > 0 && ($g->modules_non_demarres / $g->total_modules) > 0.20) {
-        $alertesCount++;
-    }
-}
-   
+        $alertesCount = 0;
+        foreach ($groupesData as $g) {
+            if ($g->avc < 0.30) $alertesCount++;
+            if ($g->has_efm > 0 && $g->avc >= 0.30 && $g->avc < 0.50) $alertesCount++;
+            if ($g->avc >= 0.30 && $g->avc < 0.50 && $g->has_efm == 0) $alertesCount++;
+            if ($g->total_modules > 0 && ($g->modules_non_demarres / $g->total_modules) > 0.20) $alertesCount++;
+        }
+
+        // ══════════════════════════════════════════
+        //  LISTE SECTEURS (pour les dropdowns frontend)
+        // ══════════════════════════════════════════
+        $secteursList = Secteur::select('id', 'nom')->orderBy('nom')->get();
+
+        // Groupes list - seulement si secteur_id fourni
+        $groupesList = [];
+        if ($secteurId) {
+            $groupesList = Groupe::select('groupes.id', 'groupes.nom', 'groupes.creneau', 'groupes.annee_formation')
+                ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+                ->where('filieres.secteur_id', $secteurId)
+                ->when($creneau, fn($q) => $q->where('groupes.creneau', $creneau))
+                ->when($annee,   fn($q) => $q->where('groupes.annee_formation', $annee))
+                ->orderBy('groupes.nom')
+                ->get();
+        }
+
+        // Modules list - seulement si secteur_id fourni
+        $modulesList = [];
+        $groupeId    = $request->groupe_id;
+
+        if ($secteurId) {
+            $modulesList = DB::table('modules')
+                ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
+                ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+                ->select(
+                    'modules.id',
+                    'modules.code',
+                    'modules.intitule',
+                    'modules.mh_drif',
+                    'modules.mh_realisee_globale',
+                    'modules.mh_restante',
+                    'modules.taux_realisation',
+                    'modules.seance_efm',
+                    'groupes.nom as groupe_nom'
+                )
+                ->where('filieres.secteur_id', $secteurId)
+                ->when($creneau,  fn($q) => $q->where('groupes.creneau', $creneau))
+                ->when($annee,    fn($q) => $q->where('groupes.annee_formation', $annee))
+                ->when($groupeId, fn($q) => $q->where('modules.groupe_id', $groupeId))
+                ->orderBy('groupes.nom')
+                ->orderBy('modules.code')
+                ->limit(200)
+                ->get();
+        }
 
         return response()->json([
-    'total_formateurs'    => $totalFormateurs,
-    'total_groupes'       => $totalGroupes,
-    'total_modules'       => $totalModules,
-    'total_filieres'      => $totalFilieres,
-    'total_secteurs'      => $totalSecteurs,
-    'total_surveillants'  => $totalSurveillants,
-    'mh_realisee_totale'  => round($mhRealisee),
-    'mh_restante_totale'  => round($mhRestante),
-    'mh_drif_totale'      => round($mhDrif),
-    'avc_moyen_global'    => round($avcMoyen, 4),
-    'effectif_total'      => $effectifTotal,
-    'avc_par_secteur'     => $avcParSecteur,
-    'distribution_groupes'=> $distribution,
-    'mh_par_filiere'      => $mhParFiliere,
-    'groupes_par_niveau'  => $groupesParNiveau,
-    'formateurs_actifs'   => Formateur::where('statut', 'actif')->count(),
-    'formateurs_inactifs' => Formateur::where('statut', 'inactif')->count(),
-    'par_specialite'      => [],
-    'alertes_count'       => $alertesCount,   // ← AJOUTER
+            'total_formateurs'    => $totalFormateurs,
+            'total_groupes'       => $totalGroupes,
+            'total_modules'       => $totalModules,
+            'total_filieres'      => $totalFilieres,
+            'total_secteurs'      => $totalSecteurs,
+            'total_surveillants'  => $totalSurveillants,
+            'mh_realisee_totale'  => round($mhRealisee),
+            'mh_restante_totale'  => round($mhRestante),
+            'mh_drif_totale'      => round($mhDrif),
+            'avc_moyen_global'    => round($avcMoyen, 4),
+            'effectif_total'      => $effectifTotal,
+            'avc_par_secteur'     => $avcParSecteur,
+            'distribution_groupes'=> $distribution,
+            'mh_par_filiere'      => $mhParFiliere,
+            'groupes_par_niveau'  => $groupesParNiveau,
+            'formateurs_actifs'   => Formateur::where('statut', 'actif')->count(),
+            'formateurs_inactifs' => Formateur::where('statut', 'inactif')->count(),
+            'par_specialite'      => [],
+            'alertes_count'       => $alertesCount,
+            'secteurs_list'       => $secteursList,
+            'groupes_list'        => $groupesList,
+            'modules_list'        => $modulesList,
+            // Filtres actifs renvoyés (utile pour debug frontend)
+            'filtres_actifs'      => array_filter([
+                'secteur_id' => $secteurId,
+                'creneau'    => $creneau,
+                'annee'      => $annee,
+                'seuil'      => $seuil,
+            ]),
         ]);
     }
 }
