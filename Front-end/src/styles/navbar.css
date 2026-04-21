@@ -1,20 +1,25 @@
 /* ================================================
-   SIDEBAR / NAVBAR — Design Professionnel
+   SIDEBAR / NAVBAR — Thème Vert · Blanc · Clair
    ================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --sidebar-bg:     #0f172a;
-  --sidebar-hover:  #1e293b;
-  --sidebar-active: #1a56db;
-  --sidebar-text:   #94a3b8;
-  --sidebar-light:  #e2e8f0;
+  --green:          #22c55e;
+  --green-hover:    #16a34a;
+  --green-light:    #dcfce7;
+  --green-glow:     rgba(34,197,94,0.12);
+  --sidebar-bg:     #ffffff;
+  --sidebar-surface:#f8fafc;
+  --sidebar-hover:  #f0fdf4;
+  --sidebar-border: #e4e4e7;
+  --sidebar-text:   #71717a;
+  --sidebar-light:  #f4f4f5;
   --sidebar-width:  260px;
-  --primary:        #1a56db;
+  --primary:        #22c55e;
 }
 
-/* ── Sidebar ────────────────────────────────── */
+/* ── Sidebar ───────────────────────────────── */
 .sidebar {
   width: var(--sidebar-width);
   min-height: 100vh;
@@ -24,13 +29,14 @@
   position: fixed;
   left: 0; top: 0;
   z-index: 100;
-  box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+  box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+  border-right: 1px solid var(--sidebar-border);
 }
 
-/* ── Header sidebar ─────────────────────────── */
+/* ── Header ─────────────────────────────────── */
 .sidebar-header {
   padding: 1.75rem 1.5rem 1rem;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .sidebar-logo {
@@ -39,21 +45,19 @@
   gap: 0.75rem;
 }
 
-.logo-icon {
-  font-size: 1.8rem;
-}
+.logo-icon { font-size: 1.8rem; }
 
 .logo-text {
   font-family: 'Poppins', sans-serif;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  color: white;
+  color: #18181b;
   letter-spacing: 3px;
 }
 
 .sidebar-subtitle {
   font-family: 'Poppins', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--sidebar-text);
   margin-top: 0.25rem;
   letter-spacing: 0.5px;
@@ -64,38 +68,38 @@
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #1e293b;
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .user-avatar {
   width: 40px; height: 40px;
-  background: linear-gradient(135deg, var(--primary), #3b82f6);
+  background: var(--green);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 1.1rem;
-  color: white;
+  font-size: 1.05rem;
+  color: #111;
   flex-shrink: 0;
 }
 
 .user-name {
   font-family: 'Poppins', sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   font-weight: 600;
-  color: var(--sidebar-light);
+  color: #18181b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* ── Badge rôle ─────────────────────────────── */
+/* ── Role badges ────────────────────────────── */
 .role-badge {
   font-family: 'Poppins', sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 20px;
@@ -105,9 +109,9 @@
   margin-top: 3px;
 }
 
-.role-directeur   { background: rgba(26,86,219,0.2);  color: #60a5fa; }
-.role-surveillant { background: rgba(16,185,129,0.2); color: #34d399; }
-.role-formateur   { background: rgba(245,158,11,0.2); color: #fbbf24; }
+.role-directeur   { background: var(--green-glow); color: var(--green); }
+.role-surveillant { background: rgba(234,179,8,0.14); color: #b45309; }
+.role-formateur   { background: rgba(99,102,241,0.12); color: #4f46e5; }
 
 /* ── Navigation ─────────────────────────────── */
 .sidebar-nav {
@@ -120,37 +124,39 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: 10px;
+  padding: 0.68rem 0.85rem;
+  border-radius: 8px;
   text-decoration: none;
   color: var(--sidebar-text);
   font-family: 'Poppins', sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   font-weight: 400;
   margin-bottom: 2px;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.18s, color 0.18s;
 }
 
 .nav-item:hover {
   background: var(--sidebar-hover);
-  color: var(--sidebar-light);
+  color: #18181b;
 }
 
 .nav-item--active {
-  background: var(--sidebar-active);
-  color: white;
-  font-weight: 500;
+  background: var(--green-glow);
+  color: var(--green-hover);
+  font-weight: 600;
+  border-left: 3px solid var(--green);
+  padding-left: calc(0.85rem - 3px);
 }
 
 .nav-icon {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   flex-shrink: 0;
 }
 
-/* ── Footer sidebar (déconnexion) ───────────── */
+/* ── Footer (déconnexion) ───────────────────── */
 .sidebar-footer {
   padding: 1rem 0.75rem 1.5rem;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--sidebar-border);
 }
 
 .logout-btn {
@@ -158,19 +164,19 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.7rem 0.85rem;
+  padding: 0.68rem 0.85rem;
   background: transparent;
-  border: 1px solid #ef4444;
-  border-radius: 10px;
+  border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 8px;
   color: #ef4444;
   font-family: 'Poppins', sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   font-weight: 500;
   cursor: pointer;
-  transition: 0.2s, color 0.2s;
+  transition: background 0.18s, color 0.18s;
 }
 
 .logout-btn:hover {
-  background: #ef4444;
-  color: white;
+  background: rgba(239,68,68,0.07);
+  color: #dc2626;
 }
