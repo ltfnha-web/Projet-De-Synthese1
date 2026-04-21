@@ -56,7 +56,7 @@ function SeanceCell({ s }) {
 }
 
 // ── Modal Créer Emploi ────────────────────────────────────────────────────────
-function ModalCreerEmploi({ onClose, onSaved, groupes }) {
+function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
   const [form, setForm] = useState({
     groupe_id: "", date_debut: new Date().toISOString().split("T")[0], semestre: "S1",
   });
@@ -210,6 +210,50 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
             </div>
           </div>
 
+          {(() => {
+            const refs = plannings.filter(
+              p => String(p.groupe_id) === String(form.groupe_id) && p.semestre === form.semestre
+            );
+            if (!form.groupe_id || refs.length === 0) return null;
+            return (
+              <div style={{
+                background: "var(--p0)", border: "1px solid var(--p1)",
+                borderRadius: "var(--r-md)", padding: "12px 16px", marginBottom: 18,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--p6)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                  {Ico.cal} {refs.length} planning(s) disponible(s) pour {form.semestre} — référence pour la grille
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {refs.map(p => (
+                    <div key={p.id} style={{
+                      background: "white", border: "1px solid var(--p2)",
+                      borderRadius: 8, padding: "7px 12px", fontSize: 11,
+                      display: "flex", flexDirection: "column", gap: 2, minWidth: 170,
+                    }}>
+                      <span style={{ fontWeight: 700, color: "var(--sl8)", fontSize: 11 }}>{toStr(p.module_nom)}</span>
+                      <span style={{ color: "var(--sl5)", fontSize: 10 }}>{toStr(p.formateur_nom)}</span>
+                      <div style={{ display: "flex", gap: 6, marginTop: 3, alignItems: "center" }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--p6)" }}>{p.mh_drif}h</span>
+                        <span style={{ color: "var(--sl3)", fontSize: 10 }}>·</span>
+                        <span style={{ fontSize: 10, color: "#d97706", fontWeight: 600 }}>
+                          {parseFloat(p.charge_hebdo) || (parseFloat(p.mh_drif) / 23).toFixed(1)}h/sem
+                        </span>
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10,
+                          background: p.type === "Locale" ? "#fef3c7" : "#eff6ff",
+                          color: p.type === "Locale" ? "#92400e" : "#1d4ed8",
+                          border: `1px solid ${p.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
+                        }}>
+                          {p.type === "Locale" ? "L" : "R"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{
             fontSize: 11, fontWeight: 700, color: "var(--sl5)",
             textTransform: "uppercase", letterSpacing: ".6px",
@@ -339,6 +383,7 @@ function ModalCreerEmploi({ onClose, onSaved, groupes }) {
 export default function Emplois() {
   const [groupes, setGroupes]         = useState([]);
   const [emplois, setEmplois]         = useState([]);
+  const [plannings, setPlannings]     = useState([]);
   const [loading, setLoading]         = useState(true);
   const [showModal, setModal]         = useState(false);
   const [emploiActif, setEmploiActif] = useState(null);
@@ -349,9 +394,10 @@ export default function Emplois() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [gRes, eRes] = await Promise.allSettled([
+      const [gRes, eRes, pRes] = await Promise.allSettled([
         axios.get("/pole-groupes"),
         axios.get("/emplois"),
+        axios.get("/plannings"),
       ]);
       if (gRes.status === "fulfilled") {
         const d = gRes.value.data;
@@ -360,6 +406,10 @@ export default function Emplois() {
       if (eRes.status === "fulfilled") {
         const d = eRes.value.data;
         setEmplois(Array.isArray(d) ? d : (d.data ?? []));
+      }
+      if (pRes.status === "fulfilled") {
+        const d = pRes.value.data;
+        setPlannings(d.plannings ?? (Array.isArray(d) ? d : (d.data ?? [])));
       }
     } finally { setLoading(false); }
   };
@@ -412,6 +462,7 @@ export default function Emplois() {
           onClose={() => setModal(false)}
           onSaved={() => { setModal(false); fetchAll(); flash("Emploi du temps créé."); }}
           groupes={groupes}
+          plannings={plannings}
         />
       )}
 
@@ -481,6 +532,168 @@ export default function Emplois() {
         </div>
       )}
 
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          body > * { visibility: hidden !important; }
+          #offppt-print, #offppt-print * { visibility: visible !important; }
+          #offppt-print {
+            position: fixed; top: 0; left: 0;
+            width: 100%; background: white;
+            font-family: Arial, sans-serif;
+          }
+          .op-table { width: 100%; border-collapse: collapse; }
+          .op-table th, .op-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
+          .op-cell-content { min-height: 38px; }
+        }
+      `}</style>
+
+      {emploiActif && (
+        <div id="offppt-print" style={{ display: "none" }}>
+          {/* ── Header ── */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 3, fontSize: 9 }}>
+            <tbody>
+              <tr>
+                <td style={{ border: "1px solid #000", width: "14%", padding: "4px 6px", textAlign: "center", verticalAlign: "middle" }}>
+                  <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 2 }}>OFPPT</div>
+                  <div style={{ direction: "rtl", fontSize: 8.5 }}>مكتب التكوين المهني</div>
+                  <div style={{ direction: "rtl", fontSize: 8.5 }}>وإنعاش الشغل</div>
+                  <div style={{ direction: "rtl", fontSize: 8, color: "#555" }}>المملكة المغربية</div>
+                </td>
+                <td style={{ border: "1px solid #000", width: "70%", textAlign: "center", verticalAlign: "middle", padding: "6px" }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 3, marginBottom: 4 }}>EMPLOI DU TEMPS</div>
+                  <div style={{ fontSize: 11, direction: "rtl", fontFamily: "serif", color: "#333" }}>جدول التوقيت الأسبوعي</div>
+                  <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>Année de Formation 2025-2026</div>
+                </td>
+                <td style={{ border: "1px solid #000", width: "16%", textAlign: "center", verticalAlign: "middle", padding: "4px 6px", fontSize: 9 }}>
+                  <div style={{ fontWeight: 700, fontSize: 11 }}>DRRSK</div>
+                  <div style={{ fontWeight: 700, fontSize: 10, marginTop: 2 }}>CF SALÉ I</div>
+                  <div style={{ fontSize: 8.5, color: "#444" }}>ISTA HAY SALAM</div>
+                  <div style={{ fontSize: 8.5, color: "#444" }}>Salé</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── Info fields ── */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 3, fontSize: 9 }}>
+            <tbody>
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "3px 7px", width: "25%" }}>
+                  <span style={{ fontWeight: 700 }}>EFP : </span>ISTA HAY SALAM SALE
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 7px", width: "25%" }}>
+                  <span style={{ fontWeight: 700 }}>Filière : </span>{toStr(emploiActif.filiere ?? "—")}
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 7px", width: "25%" }}>
+                  <span style={{ fontWeight: 700 }}>N° Groupe : </span>{toStr(emploiActif.groupe)}
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 7px", width: "25%" }}>
+                  <span style={{ fontWeight: 700 }}>Semestre : </span>{toStr(emploiActif.semestre ?? "—")}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "3px 7px" }} colSpan={2}>
+                  <span style={{ fontWeight: 700 }}>Formateur Parrain : </span>___________________________
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 7px" }}>
+                  <span style={{ fontWeight: 700 }}>Période : </span>{toStr(emploiActif.periodeDebut ?? emploiActif.periode_debut ?? "—")}
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 7px" }}>
+                  <span style={{ fontWeight: 700 }}>Nbre d'heures : </span>___h/sem
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── Training type checkboxes ── */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 3, fontSize: 8.5 }}>
+            <tbody>
+              <tr>
+                {[
+                  "Technicien Spécialisé", "Technicien", "Qualification",
+                  "Spécialisation", "Formation Qualifiante", "Bac Pro", "Parcours Collégial",
+                ].map(t => (
+                  <td key={t} style={{ border: "1px solid #000", padding: "3px 6px", textAlign: "center" }}>
+                    <input type="checkbox" style={{ marginRight: 4 }} readOnly />{t}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── Timetable ── */}
+          <table className="op-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 8.5 }}>
+            <thead>
+              <tr style={{ background: "#d0d8e8" }}>
+                <th style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "center", width: 60, fontWeight: 700 }}>
+                  Jours
+                </th>
+                {SEANCES.map((s, i) => (
+                  <th key={i} style={{ border: "1px solid #000", padding: "4px 8px", textAlign: "center", fontWeight: 700 }}>
+                    <div>{s.label}</div>
+                    <div style={{ fontWeight: 400, fontSize: 8 }}>{s.horaire}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(emploiActif.jours ?? {}).map(([jour, seances]) => (
+                <tr key={jour}>
+                  <td style={{ border: "1px solid #000", padding: "5px 8px", fontWeight: 700, textAlign: "center", fontSize: 9 }}>
+                    {jour}
+                  </td>
+                  {(seances ?? [null, null, null, null]).map((s, i) => (
+                    <td key={i} style={{ border: "1px solid #000", padding: "4px 6px", verticalAlign: "top", minWidth: 120 }}>
+                      {s && s.module ? (
+                        <div className="op-cell-content">
+                          <div style={{ fontWeight: 700, fontSize: 8.5, marginBottom: 2, lineHeight: 1.3 }}>
+                            {toStr(s.module)}
+                          </div>
+                          <div style={{ fontSize: 8, color: "#333", marginBottom: 2 }}>
+                            {toStr(s.formateur)}
+                          </div>
+                          <div style={{ fontSize: 7.5, color: "#555" }}>
+                            {s.mode === "DISTANCIEL" ? "Formation à distance" : "Formation en présentiel"}
+                            {s.salle ? ` / S${s.salle}` : ""}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ minHeight: 38 }} />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* ── Footer ── */}
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 3, fontSize: 9 }}>
+            <tbody>
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "3px 8px", width: "33%", textAlign: "center" }}>
+                  <div style={{ fontWeight: 700 }}>Emargements</div>
+                  <div style={{ height: 28 }} />
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 8px", width: "34%", textAlign: "center" }}>
+                  <div style={{ fontWeight: 700 }}>Fait à Salé, le {toStr(emploiActif.periodeDebut ?? emploiActif.periode_debut ?? "—")}</div>
+                  <div style={{ height: 28 }} />
+                </td>
+                <td style={{ border: "1px solid #000", padding: "3px 8px", width: "33%", textAlign: "center" }}>
+                  <div style={{ fontWeight: 700 }}>Le Directeur</div>
+                  <div style={{ marginTop: 20, fontSize: 8.5 }}>
+                    <div>KADDOURI HICHAM</div>
+                    <div>DIRECTEUR D'ETABLISSEMENT</div>
+                    <div>ISTA HAY SALAM SALE</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {emploiActif && (
         <div className="table-card" style={{ padding: 0 }}>
           <div style={{
@@ -498,7 +711,7 @@ export default function Emplois() {
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn-secondary" style={{ height: 32, fontSize: 12, background: "rgba(255,255,255,.12)", color: "white", border: "1px solid rgba(255,255,255,.2)" }}
                 onClick={() => window.print()}>
-                {Ico.print} Imprimer
+                {Ico.print} Imprimer (OFFPPT)
               </button>
               <button className="btn-secondary" style={{ height: 32, fontSize: 12, background: "rgba(255,255,255,.12)", color: "white", border: "1px solid rgba(255,255,255,.2)" }}
                 onClick={() => setEmploiActif(null)}>

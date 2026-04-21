@@ -23,26 +23,29 @@ export default function Pole() {
   const [secteurs, setSecteurs]     = useState([]);
   const [formateurs, setFormateurs] = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState("");
-  const [filterFormateur, setFilterFormateur] = useState("");
   const [alert, setAlert]           = useState(null);
 
-  // Détail secteur sélectionné
+  // Secteur filters
+  const [search,           setSearch]           = useState("");
+  const [filterFormateur,  setFilterFormateur]  = useState("");
+  const [filterAvc,        setFilterAvc]        = useState("");
+  const [filterCritiques,  setFilterCritiques]  = useState("");
+
+  // Detail panel
   const [selectedSecteur, setSelectedSecteur] = useState(null);
   const [groupes, setGroupes]                 = useState([]);
   const [groupesLoading, setGroupesLoading]   = useState(false);
   const [groupeSearch, setGroupeSearch]       = useState("");
   const [groupeAnnee, setGroupeAnnee]         = useState("");
 
-  // Modal assign
-  const [modal, setModal]           = useState(false);
+  // Modal
+  const [modal, setModal]             = useState(false);
   const [modalSecteur, setModalSecteur] = useState(null);
-  const [assignForm, setAssignForm] = useState({ formateur_id: "", notes: "" });
-  const [saving, setSaving]         = useState(false);
+  const [assignForm, setAssignForm]   = useState({ formateur_id: "", notes: "" });
+  const [saving, setSaving]           = useState(false);
 
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 4000); };
 
-  // Fetch secteurs
   const fetchSecteurs = useCallback(() => {
     setLoading(true);
     axios.get("/pole", { params: { search, formateur_id: filterFormateur } })
@@ -53,15 +56,12 @@ export default function Pole() {
 
   useEffect(() => { fetchSecteurs(); }, [fetchSecteurs]);
 
-  // Fetch formateurs pour le select — sans filtre statut pour tout récupérer
-useEffect(() => {
-    axios.get("/formateurs/all")  
-      .then(r => {
-        setFormateurs(Array.isArray(r.data) ? r.data : []);
-      })
-}, []);
+  useEffect(() => {
+    axios.get("/formateurs/all")
+      .then(r => setFormateurs(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, []);
 
-  // Fetch groupes d'un secteur
   const fetchGroupes = useCallback((secteurId) => {
     if (!secteurId) return;
     setGroupesLoading(true);
@@ -113,13 +113,29 @@ useEffect(() => {
     return "#ef4444";
   };
 
-  // Fix filtre __none__ (sans responsable)
+  // Client-side filters
   const filtered = secteurs.filter(s => {
     if (search && !s.nom.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterFormateur === "__none__") return !s.responsable;
-    if (filterFormateur) return s.responsable?.id == filterFormateur;
+    if (filterFormateur === "__none__") { if (s.responsable) return false; }
+    else if (filterFormateur) { if (s.responsable?.id != filterFormateur) return false; }
+    if (filterAvc) {
+      const avcPct = (s.avc_moyen || 0) * 100;
+      if (filterAvc === "critique" && avcPct >= 30) return false;
+      if (filterAvc === "faible"   && (avcPct < 30 || avcPct >= 50)) return false;
+      if (filterAvc === "moyen"    && (avcPct < 50 || avcPct >= 70)) return false;
+      if (filterAvc === "bon"      && avcPct < 70) return false;
+    }
+    if (filterCritiques === "oui" && !(s.groupes_critiques > 0)) return false;
+    if (filterCritiques === "non" && s.groupes_critiques > 0)    return false;
     return true;
   });
+
+  const hasFilters = search || filterFormateur || filterAvc || filterCritiques;
+  const activeCount = [search, filterFormateur, filterAvc, filterCritiques].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setSearch(""); setFilterFormateur(""); setFilterAvc(""); setFilterCritiques("");
+  };
 
   return (
     <div>
@@ -144,30 +160,75 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ── FILTRES ── */}
+      {/* ── Secteur filters ── */}
       <div className="table-card" style={{ marginBottom: 20 }}>
-        <div className="table-toolbar">
-          <div className="toolbar-filters">
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--sl4)", display: "flex", pointerEvents: "none" }}>{Icons.search}</span>
-              <input className="search-input" style={{ paddingLeft: 32 }} placeholder="Rechercher un secteur..."
+        <div className="filter-panel-inline">
+          <div className="filter-panel-header">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--sl5)", display: "flex" }}>{Icons.filter}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)" }}>Filtres secteurs</span>
+              {activeCount > 0 && (
+                <span style={{ background: "var(--g4)", color: "#111", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
+                  {activeCount}
+                </span>
+              )}
+            </div>
+            {hasFilters && (
+              <button className="btn-reset" onClick={resetFilters}>
+                {Icons.close} Réinitialiser
+              </button>
+            )}
+          </div>
+
+          <div className="filter-row">
+            {/* Recherche */}
+            <div style={{ position: "relative", flex: "1 1 180px", minWidth: 150 }}>
+              <span className="search-icon">{Icons.search}</span>
+              <input className="search-input filter-input" placeholder="Rechercher un secteur..."
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <select className="form-select" style={{ width: 220, height: 36 }} value={filterFormateur}
+
+            {/* Responsable */}
+            <select className="form-select filter-select" style={{ height: 36 }} value={filterFormateur}
               onChange={e => setFilterFormateur(e.target.value)}>
               <option value="">Tous les responsables</option>
               <option value="__none__">Sans responsable</option>
               {formateurs.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
             </select>
+
+            {/* AVC */}
+            <select className="form-select filter-select" style={{ height: 36, width: 175 }} value={filterAvc}
+              onChange={e => setFilterAvc(e.target.value)}>
+              <option value="">Tous niveaux AVC</option>
+              <option value="critique">AVC Critique (&lt; 30%)</option>
+              <option value="faible">AVC Faible (30–50%)</option>
+              <option value="moyen">AVC Moyen (50–70%)</option>
+              <option value="bon">AVC Bon (≥ 70%)</option>
+            </select>
+
+            {/* Groupes critiques */}
+            <select className="form-select filter-select" style={{ height: 36, width: 175 }} value={filterCritiques}
+              onChange={e => setFilterCritiques(e.target.value)}>
+              <option value="">Groupes critiques</option>
+              <option value="oui">Avec groupes critiques</option>
+              <option value="non">Sans groupes critiques</option>
+            </select>
           </div>
-          <span className="results-count">{filtered.length} secteur(s)</span>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 8 }}>
+            <span className="results-count">{filtered.length} secteur(s)</span>
+          </div>
         </div>
 
-        {/* ── TABLE SECTEURS ── */}
+        {/* ── Table secteurs ── */}
         {loading ? (
           <div className="loader"><div className="loader-spinner" /><span>Chargement...</span></div>
         ) : filtered.length === 0 ? (
-          <div className="empty"><div className="empty-icon">{Icons.map}</div><div className="empty-title">Aucun secteur</div></div>
+          <div className="empty">
+            <div className="empty-icon">{Icons.map}</div>
+            <div className="empty-title">Aucun secteur</div>
+            <div className="empty-desc">Modifiez les filtres</div>
+          </div>
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table id="table-pole" style={{ minWidth: 820 }}>
@@ -207,17 +268,16 @@ useEffect(() => {
                       }
                     </td>
                     <td>
-                      {s.responsable
-                        ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--p0)", border: "1px solid var(--p2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--p6)", flexShrink: 0 }}>
-                              {s.responsable.nom?.split(" ").map(w => w[0]).join("").slice(0, 2)}
-                            </div>
-                            <span style={{ fontSize: 13, color: "var(--sl7)" }}>{s.responsable.nom}</span>
+                      {s.responsable ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--p0)", border: "1px solid var(--p2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--p6)", flexShrink: 0 }}>
+                            {s.responsable.nom?.split(" ").map(w => w[0]).join("").slice(0, 2)}
                           </div>
-                        )
-                        : <span style={{ fontSize: 12, color: "var(--sl4)", fontStyle: "italic" }}>Non assigné</span>
-                      }
+                          <span style={{ fontSize: 13, color: "var(--sl7)" }}>{s.responsable.nom}</span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--sl4)", fontStyle: "italic" }}>Non assigné</span>
+                      )}
                     </td>
                     <td onClick={e => e.stopPropagation()}>
                       <button className="btn-icon btn-icon-edit" title="Assigner responsable" onClick={() => openAssign(s)}>{Icons.star}</button>
@@ -233,43 +293,50 @@ useEffect(() => {
         )}
       </div>
 
-      {/* ── DÉTAIL SECTEUR SÉLECTIONNÉ ── */}
+      {/* ── Détail secteur sélectionné ── */}
       {selectedSecteur && (
         <div className="table-card">
-          <div className="table-toolbar">
-            <div>
-              <strong style={{ fontSize: 14, color: "var(--sl8)" }}>
-                Groupes du secteur — {selectedSecteur.nom}
-              </strong>
-              {selectedSecteur.responsable && (
-                <span style={{ marginLeft: 12, fontSize: 12, color: "var(--p6)" }}>
-                  Responsable : {selectedSecteur.responsable.nom}
-                </span>
-              )}
+          <div className="filter-panel-inline">
+            <div className="filter-panel-header">
+              <div>
+                <strong style={{ fontSize: 14, color: "var(--sl8)" }}>
+                  Groupes du secteur — {selectedSecteur.nom}
+                </strong>
+                {selectedSecteur.responsable && (
+                  <span style={{ marginLeft: 12, fontSize: 12, color: "var(--p6)" }}>
+                    Responsable : {selectedSecteur.responsable.nom}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setSelectedSecteur(null)}>
+                  {Icons.close} Fermer
+                </button>
+              </div>
             </div>
-            <div className="toolbar-filters">
-              <div style={{ position: "relative" }}>
-                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--sl4)", display: "flex", pointerEvents: "none" }}>{Icons.search}</span>
-                <input className="search-input" style={{ paddingLeft: 32, width: 200 }} placeholder="Nom du groupe..."
+            <div className="filter-row">
+              <div style={{ position: "relative", flex: "1 1 180px", minWidth: 150 }}>
+                <span className="search-icon">{Icons.search}</span>
+                <input className="search-input filter-input" placeholder="Nom du groupe..."
                   value={groupeSearch} onChange={e => setGroupeSearch(e.target.value)} />
               </div>
-              <select className="form-select" style={{ width: 130, height: 36 }} value={groupeAnnee}
+              <select className="form-select filter-select" style={{ height: 36, width: 130 }} value={groupeAnnee}
                 onChange={e => setGroupeAnnee(e.target.value)}>
                 <option value="">Toutes années</option>
                 <option value="1">Année 1</option>
                 <option value="2">Année 2</option>
                 <option value="3">Année 3</option>
               </select>
-              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setSelectedSecteur(null)}>
-                {Icons.close} Fermer
-              </button>
             </div>
           </div>
 
           {groupesLoading ? (
             <div className="loader"><div className="loader-spinner" /></div>
           ) : groupes.length === 0 ? (
-            <div className="empty"><div className="empty-icon">{Icons.groups}</div><div className="empty-title">Aucun groupe</div></div>
+            <div className="empty">
+              <div className="empty-icon">{Icons.groups}</div>
+              <div className="empty-title">Aucun groupe</div>
+            </div>
           ) : (
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table style={{ minWidth: 780 }}>
@@ -304,7 +371,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ── MODAL ASSIGN ── */}
+      {/* ── Modal assign ── */}
       {modal && modalSecteur && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal" style={{ width: 480 }}>
@@ -323,27 +390,20 @@ useEffect(() => {
 
             <div className="form-group">
               <label className="form-label">Formateur responsable</label>
-              <select
-                className="form-select"
+              <select className="form-select"
                 value={assignForm.formateur_id}
-                onChange={e => setAssignForm(p => ({ ...p, formateur_id: e.target.value }))}
-              >
+                onChange={e => setAssignForm(p => ({ ...p, formateur_id: e.target.value }))}>
                 <option value="">— Aucun responsable —</option>
-                {formateurs.map(f => (
-                  <option key={f.id} value={f.id}>{f.nom}</option>
-                ))}
+                {formateurs.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
               </select>
             </div>
 
             <div className="form-group">
               <label className="form-label">Notes (optionnel)</label>
-              <textarea
-                className="form-input"
-                style={{ height: 80, resize: "vertical", paddingTop: 10 }}
+              <textarea className="form-input" style={{ height: 80, resize: "vertical", paddingTop: 10 }}
                 placeholder="Observations, remarques..."
                 value={assignForm.notes}
-                onChange={e => setAssignForm(p => ({ ...p, notes: e.target.value }))}
-              />
+                onChange={e => setAssignForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
 
             <div className="modal-footer">

@@ -3,98 +3,141 @@ import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
 
 const TYPE_CONFIG = {
-  critique: { label: "Critique",     color: "#9f1239", bg: "#fff1f2", border: "#fecdd3", icon: Icons.alert   },
-  warning:  { label: "Avertissement",color: "#92400e", bg: "#fffbeb", border: "#fde68a", icon: Icons.warning },
-  info:     { label: "À surveiller", color: "#1e40af", bg: "var(--p0)", border: "var(--p1)", icon: Icons.shield },
+  critique: { label: "Critique",      color: "#9f1239", bg: "#fff1f2", border: "#fecdd3", icon: Icons.alert   },
+  warning:  { label: "Avertissement", color: "#92400e", bg: "#fffbeb", border: "#fde68a", icon: Icons.warning },
+  info:     { label: "À surveiller",  color: "#1e40af", bg: "var(--p0)", border: "var(--p1)", icon: Icons.shield },
 };
 
 const CODE_LABELS = {
-  EFM_RETARD:          "EFM prévu — retard critique",
-  AVC_CRITIQUE:        "AVC très faible (< 30%)",
-  MODULE_NON_DEMARRE:  "Module non démarré",
-  AVC_FAIBLE:          "AVC à surveiller (30–50%)",
+  EFM_RETARD:         "EFM prévu — retard critique",
+  AVC_CRITIQUE:       "AVC très faible (< 30%)",
+  MODULE_NON_DEMARRE: "Module non démarré",
+  AVC_FAIBLE:         "AVC à surveiller (30–50%)",
+};
+
+const EG_ET_STYLE = {
+  EG: { bg: "#eff6ff", color: "#1d4ed8" },
+  ET: { bg: "#fefce8", color: "#92400e" },
 };
 
 export default function Alertes() {
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
   const [secteurs, setSecteurs] = useState([]);
+  const [filieres, setFilieres] = useState([]);
 
-  // Filtres
-  const [filterType, setFilterType]       = useState("");
+  const [filterType,    setFilterType]    = useState("");
   const [filterSecteur, setFilterSecteur] = useState("");
-  const [filterCode, setFilterCode]       = useState("");
+  const [filterFiliere, setFilterFiliere] = useState("");
+  const [filterCode,    setFilterCode]    = useState("");
   const [filterCreneau, setFilterCreneau] = useState("");
-  const [search, setSearch]               = useState("");
+  const [search,        setSearch]        = useState("");
+  const [moduleSearch,  setModuleSearch]  = useState("");
 
   const fetchData = useCallback(() => {
     setLoading(true);
     axios.get("/alertes", {
-      params: { type: filterType, secteur_id: filterSecteur }
+      params: {
+        type:       filterType,
+        secteur_id: filterSecteur,
+        filiere_id: filterFiliere,
+      }
     })
       .then(r => setData(r.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [filterType, filterSecteur]);
+  }, [filterType, filterSecteur, filterFiliere]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
     axios.get("/pole").then(r => setSecteurs(r.data)).catch(() => {});
+    axios.get("/filieres-list").then(r => setFilieres(r.data)).catch(() => {});
   }, []);
 
+  // Filter filières by selected secteur
+  const filteredFilieres = filterSecteur
+    ? filieres.filter(f => String(f.secteur_id) === String(filterSecteur))
+    : filieres;
+
   const alertes = (data?.alertes || []).filter(a => {
-    if (filterCode   && a.code    !== filterCode)   return false;
+    if (filterCode    && a.code    !== filterCode)    return false;
     if (filterCreneau && a.creneau !== filterCreneau) return false;
-    if (search && !a.groupe.toLowerCase().includes(search.toLowerCase())
-               && !a.filiere.toLowerCase().includes(search.toLowerCase())
-               && !a.secteur.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!a.groupe.toLowerCase().includes(q) &&
+          !a.filiere.toLowerCase().includes(q) &&
+          !a.secteur.toLowerCase().includes(q)) return false;
+    }
+    if (moduleSearch) {
+      const q = moduleSearch.toLowerCase();
+      const modules = a.modules || [];
+      const matchesModule = modules.some(
+        m => m.code?.toLowerCase().includes(q) || m.intitule?.toLowerCase().includes(q)
+      );
+      if (!matchesModule) return false;
+    }
     return true;
   });
 
+  const hasFilters = filterType || filterSecteur || filterFiliere || filterCode || filterCreneau || search || moduleSearch;
+
+  const resetFilters = () => {
+    setFilterType(""); setFilterSecteur(""); setFilterFiliere("");
+    setFilterCode(""); setFilterCreneau(""); setSearch(""); setModuleSearch("");
+  };
+
+  const activeCount = [filterType, filterSecteur, filterFiliere, filterCode, filterCreneau, search, moduleSearch].filter(Boolean).length;
+
   const summaryCards = [
-    { label: "Critiques",       count: data?.critique || 0, color: "#ef4444", bg: "#fff1f2", icon: Icons.alert   },
-    { label: "Avertissements",  count: data?.warning  || 0, color: "#f59e0b", bg: "#fffbeb", icon: Icons.warning },
-    { label: "À surveiller",    count: data?.info     || 0, color: "#1a5276", bg: "var(--p0)", icon: Icons.shield },
-    { label: "Total alertes",   count: data?.total    || 0, color: "var(--sl6)", bg: "var(--sl1)", icon: Icons.filter },
+    { label: "Critiques",      count: data?.critique || 0, color: "#ef4444", bg: "#fff1f2", icon: Icons.alert,   key: "critique" },
+    { label: "Avertissements", count: data?.warning  || 0, color: "#f59e0b", bg: "#fffbeb", icon: Icons.warning, key: "warning"  },
+    { label: "À surveiller",   count: data?.info     || 0, color: "#1a5276", bg: "var(--p0)", icon: Icons.shield, key: "info"   },
+    { label: "Total alertes",  count: data?.total    || 0, color: "var(--sl6)", bg: "var(--sl1)", icon: Icons.filter, key: "" },
   ];
 
   return (
     <div>
+      {/* ── Header ── */}
       <div className="pg-header">
         <div className="pg-header-left">
           <div className="pg-title">Alertes Pédagogiques</div>
           <div className="pg-subtitle">
-            Groupes et modules nécessitant une intervention — générées automatiquement depuis les données importées
+            Groupes et modules nécessitant une intervention — générées automatiquement
           </div>
         </div>
         <button className="btn-secondary" onClick={fetchData}>{Icons.filter} Actualiser</button>
       </div>
 
-      {/* Summary cards */}
+      {/* ── Summary cards ── */}
       {data && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22 }}>
           {summaryCards.map((c, i) => (
             <div key={i} style={{
-              background: c.bg, border: `1px solid ${c.color}22`,
-              borderRadius: 12, padding: "16px 18px",
-              display: "flex", alignItems: "center", gap: 14,
-              cursor: i < 3 ? "pointer" : "default",
-              outline: filterType === ["critique","warning","info"][i] ? `2px solid ${c.color}` : "none",
-              transition: "outline .15s",
+              background: c.bg,
+              border: `1px solid ${c.color}22`,
+              borderRadius: 12,
+              padding: "16px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              cursor: c.key ? "pointer" : "default",
+              outline: filterType === c.key ? `2px solid ${c.color}` : "none",
+              transition: "outline .15s, transform .15s",
+              transform: filterType === c.key ? "translateY(-1px)" : "none",
             }}
-              onClick={() => {
-                if (i < 3) {
-                  const types = ["critique", "warning", "info"];
-                  setFilterType(filterType === types[i] ? "" : types[i]);
-                }
-              }}
+              onClick={() => c.key && setFilterType(filterType === c.key ? "" : c.key)}
             >
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: c.color + "20", display: "flex", alignItems: "center", justifyContent: "center", color: c.color, flexShrink: 0 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: c.color + "20",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: c.color, flexShrink: 0,
+              }}>
                 {c.icon}
               </div>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: c.color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{c.count}</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: c.color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{c.count}</div>
                 <div style={{ fontSize: 12, color: "var(--sl5)", marginTop: 2 }}>{c.label}</div>
               </div>
             </div>
@@ -102,39 +145,79 @@ export default function Alertes() {
         </div>
       )}
 
-      {/* Filtres */}
-      <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", padding: "14px 18px", marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ position: "relative" }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--sl4)", display: "flex", pointerEvents: "none" }}>{Icons.search}</span>
-          <input className="search-input" style={{ paddingLeft: 32, width: 220 }} placeholder="Groupe, filière, secteur..."
-            value={search} onChange={e => setSearch(e.target.value)} />
+      {/* ── Filter panel ── */}
+      <div className="filter-panel" style={{ marginBottom: 16 }}>
+        <div className="filter-panel-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "var(--sl5)", display: "flex" }}>{Icons.filter}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)" }}>Filtres</span>
+            {activeCount > 0 && (
+              <span style={{
+                background: "var(--g4)", color: "#111",
+                fontSize: 10, fontWeight: 700,
+                padding: "2px 7px", borderRadius: 20,
+              }}>{activeCount}</span>
+            )}
+          </div>
+          {hasFilters && (
+            <button className="btn-reset" onClick={resetFilters}>
+              {Icons.close} Réinitialiser
+            </button>
+          )}
         </div>
-        <select className="form-select" style={{ width: 180, height: 36 }} value={filterSecteur}
-          onChange={e => { setFilterSecteur(e.target.value); }}>
-          <option value="">Tous les secteurs</option>
-          {secteurs.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
-        </select>
-        <select className="form-select" style={{ width: 190, height: 36 }} value={filterCode}
-          onChange={e => setFilterCode(e.target.value)}>
-          <option value="">Tous les types</option>
-          {Object.entries(CODE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select className="form-select" style={{ width: 150, height: 36 }} value={filterCreneau}
-          onChange={e => setFilterCreneau(e.target.value)}>
-          <option value="">Tous les créneaux</option>
-          <option value="CDJ">Cours du Jour (CDJ)</option>
-          <option value="CDS">Cours du Soir (CDS)</option>
-        </select>
-        {(filterType || filterSecteur || filterCode || filterCreneau || search) && (
-          <button className="btn-secondary" style={{ fontSize: 12, height: 36 }}
-            onClick={() => { setFilterType(""); setFilterSecteur(""); setFilterCode(""); setFilterCreneau(""); setSearch(""); }}>
-            {Icons.close} Réinitialiser
-          </button>
-        )}
-        <span className="results-count" style={{ marginLeft: "auto" }}>{alertes.length} alerte(s)</span>
+
+        <div className="filter-row">
+          {/* Recherche groupe/filière/secteur */}
+          <div style={{ position: "relative", flex: "1 1 200px", minWidth: 160 }}>
+            <span className="search-icon">{Icons.search}</span>
+            <input className="search-input filter-input" placeholder="Groupe, filière, secteur..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+
+          {/* Recherche module */}
+          <div style={{ position: "relative", flex: "1 1 180px", minWidth: 150 }}>
+            <span className="search-icon">{Icons.book}</span>
+            <input className="search-input filter-input" placeholder="Code ou intitulé module..."
+              style={{ paddingLeft: 32 }}
+              value={moduleSearch} onChange={e => setModuleSearch(e.target.value)} />
+          </div>
+
+          {/* Secteur */}
+          <select className="form-select filter-select" value={filterSecteur}
+            onChange={e => { setFilterSecteur(e.target.value); setFilterFiliere(""); }}>
+            <option value="">Tous les secteurs</option>
+            {secteurs.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+          </select>
+
+          {/* Filière */}
+          <select className="form-select filter-select" value={filterFiliere}
+            onChange={e => setFilterFiliere(e.target.value)}>
+            <option value="">Toutes les filières</option>
+            {filteredFilieres.map(f => <option key={f.id} value={f.id}>{f.intitule}</option>)}
+          </select>
+
+          {/* Code alerte */}
+          <select className="form-select filter-select" value={filterCode}
+            onChange={e => setFilterCode(e.target.value)}>
+            <option value="">Tous les codes</option>
+            {Object.entries(CODE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+
+          {/* Créneau */}
+          <select className="form-select filter-select" value={filterCreneau}
+            onChange={e => setFilterCreneau(e.target.value)}>
+            <option value="">Tous créneaux</option>
+            <option value="CDJ">Cours du Jour (CDJ)</option>
+            <option value="CDS">Cours du Soir (CDS)</option>
+          </select>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 8 }}>
+          <span className="results-count">{alertes.length} alerte(s) affichée(s)</span>
+        </div>
       </div>
 
-      {/* Liste alertes */}
+      {/* ── Alert list ── */}
       {loading ? (
         <div className="loader"><div className="loader-spinner" /><span>Analyse en cours...</span></div>
       ) : alertes.length === 0 ? (
@@ -144,34 +227,92 @@ export default function Alertes() {
           <div className="empty-desc">Tous les groupes sont dans les normes selon les filtres sélectionnés</div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {alertes.map((a, i) => {
             const cfg = TYPE_CONFIG[a.type];
+            const modules = a.modules || [];
             return (
               <div key={i} style={{
                 background: cfg.bg,
                 border: `1px solid ${cfg.border}`,
                 borderRadius: 12,
-                padding: "14px 18px",
+                padding: "16px 18px",
                 display: "flex",
                 alignItems: "flex-start",
                 gap: 14,
                 animation: `slideUp .3s ease ${i * .03}s both`,
               }}>
                 {/* Icon */}
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: cfg.color + "18", display: "flex", alignItems: "center", justifyContent: "center", color: cfg.color, flexShrink: 0 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 9,
+                  background: cfg.color + "18",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: cfg.color, flexShrink: 0,
+                }}>
                   {cfg.icon}
                 </div>
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                  {/* Title row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: cfg.color }}>{a.titre}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: cfg.color, color: "white", padding: "2px 8px", borderRadius: 20 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700,
+                      background: cfg.color, color: "white",
+                      padding: "2px 8px", borderRadius: 20,
+                    }}>
                       {CODE_LABELS[a.code] || a.code}
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, color: "var(--sl7)", lineHeight: 1.55, marginBottom: 8 }}>{a.message}</p>
+
+                  {/* Message */}
+                  <p style={{ fontSize: 13, color: "var(--sl7)", lineHeight: 1.55, marginBottom: 10 }}>{a.message}</p>
+
+                  {/* Module badges */}
+                  {modules.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                      {modules.map((m, j) => {
+                        const egStyle = EG_ET_STYLE[m.eg_et] || { bg: "var(--sl1)", color: "var(--sl5)" };
+                        return (
+                          <span key={j} style={{
+                            display: "inline-flex", alignItems: "center", gap: 6,
+                            padding: "4px 10px",
+                            background: egStyle.bg,
+                            color: egStyle.color,
+                            border: `1px solid ${egStyle.color}30`,
+                            borderRadius: 8,
+                            fontSize: 11,
+                          }}>
+                            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                              {m.code}
+                            </span>
+                            {m.intitule && (
+                              <span style={{
+                                fontFamily: "var(--font)",
+                                fontWeight: 500,
+                                color: egStyle.color + "cc",
+                                fontSize: 11,
+                              }}>
+                                — {m.intitule}
+                              </span>
+                            )}
+                            {m.eg_et && (
+                              <span style={{
+                                fontSize: 9, fontWeight: 700,
+                                background: egStyle.color + "20",
+                                padding: "1px 5px", borderRadius: 10,
+                                fontFamily: "var(--font)",
+                                flexShrink: 0,
+                              }}>{m.eg_et}</span>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Meta info */}
                   <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                     {a.avc > 0 && (
                       <span style={{ fontSize: 11.5, fontWeight: 600, color: cfg.color }}>
@@ -187,7 +328,12 @@ export default function Alertes() {
                       <span style={{ fontSize: 11.5, color: "var(--sl5)" }}>Effectif : {a.effectif}</span>
                     )}
                     {a.creneau && (
-                      <span style={{ fontSize: 11.5, color: "var(--sl5)" }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600,
+                        background: a.creneau === "CDS" ? "#fef3c7" : "#eff6ff",
+                        color: a.creneau === "CDS" ? "#92400e" : "#1d4ed8",
+                        padding: "2px 8px", borderRadius: 20,
+                      }}>
                         {a.creneau === "CDS" ? "Cours du Soir" : "Cours du Jour"}
                       </span>
                     )}
@@ -196,9 +342,16 @@ export default function Alertes() {
                 </div>
 
                 {/* Right meta */}
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--sl7)", marginBottom: 4 }}>{a.groupe}</div>
-                  <div style={{ fontSize: 11, color: "var(--sl5)" }}>{a.filiere}</div>
+                <div style={{ textAlign: "right", flexShrink: 0, minWidth: 120 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--sl8)", marginBottom: 4 }}>{a.groupe}</div>
+                  <div style={{ fontSize: 11, color: "var(--sl5)", marginBottom: 6 }}>{a.filiere}</div>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700,
+                    background: cfg.color + "15", color: cfg.color,
+                    padding: "2px 8px", borderRadius: 20, border: `1px solid ${cfg.color}30`,
+                  }}>
+                    {cfg.label}
+                  </span>
                 </div>
               </div>
             );

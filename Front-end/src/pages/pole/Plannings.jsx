@@ -525,6 +525,18 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
       <td style={{ padding: "0 10px", borderRight: "2px solid var(--border)" }}>
         <AvcBar mhDrif={p.mh_drif} totalPrevu={p.total_prevu} />
       </td>
+      <td style={{ textAlign: "center", padding: "4px 6px" }}>
+        <span style={{
+          display: "inline-block",
+          fontSize: 10, fontWeight: 700,
+          padding: "2px 7px", borderRadius: 20,
+          background: p.type === "Locale" ? "#fef3c7" : "#eff6ff",
+          color: p.type === "Locale" ? "#92400e" : "#1d4ed8",
+          border: `1px solid ${p.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
+        }}>
+          {p.type === "Locale" ? "L" : "R"}
+        </span>
+      </td>
       {semainesAffichees.map(s => (
         <CellSemaine key={s.num} planningId={p.id} semaineNum={s.num}
           value={parseFloat(p.semaines?.[s.num]) || 0}
@@ -945,7 +957,7 @@ export default function Plannings() {
             <table style={{ borderCollapse: "collapse", fontSize: 12, tableLayout: "auto", width: "max-content", minWidth: "100%" }}>
               <thead>
                 <tr style={{ background: "var(--sl1)" }}>
-                  <th colSpan={6} style={{
+                  <th colSpan={7} style={{
                     textAlign: "left", padding: "6px 14px", fontSize: 11, fontWeight: 600,
                     color: "var(--sl5)", borderRight: "2px solid var(--border)",
                     position: "sticky", left: 0, zIndex: 3, background: "var(--sl1)", whiteSpace: "nowrap",
@@ -972,6 +984,7 @@ export default function Plannings() {
                   <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 56 }}>MH</th>
                   <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 68 }}>Restante</th>
                   <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 96, borderRight: "2px solid var(--border)" }}>Avancement</th>
+                  <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 44 }}>R/L</th>
                   {semainesAffichees.map(s => (
                     <th key={s.num} style={{
                       textAlign: "center", fontSize: 9, padding: "5px 0", fontWeight: 500,
@@ -987,7 +1000,7 @@ export default function Plannings() {
               <tbody>
                 {plannings.length === 0 ? (
                   <tr>
-                    <td colSpan={6 + semainesAffichees.length + 1}>
+                    <td colSpan={7 + semainesAffichees.length + 1}>
                       <div className="empty">
                         <div className="empty-icon">{Ico.filter}</div>
                         <div className="empty-title">Aucun planning</div>
@@ -1016,7 +1029,7 @@ export default function Plannings() {
                     <td style={{ textAlign: "center", fontWeight: 700, fontSize: 12, color: "var(--sl7)" }}>
                       {plannings.reduce((a, p) => a + (p.mh_drif ?? 0), 0)}h
                     </td>
-                    <td /><td style={{ borderRight: "2px solid var(--border)" }} />
+                    <td /><td style={{ borderRight: "2px solid var(--border)" }} /><td />
                     {semainesAffichees.map(s => {
                       const t = totalParSemaine[s.num];
                       return (

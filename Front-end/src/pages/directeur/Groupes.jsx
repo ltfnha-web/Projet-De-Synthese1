@@ -19,6 +19,17 @@ function AvcBar({ value }) {
   );
 }
 
+const CHIP_LABELS = {
+  filiere:   (val, list) => list.find(f => String(f.id) === String(val))?.intitule || val,
+  secteur:   (val, list) => list.find(s => String(s.id) === String(val))?.nom || val,
+  annee:     (val)       => `Année ${val}`,
+  mode:      (val)       => val,
+  creneau:   (val)       => val === "CDJ" ? "Cours du Jour" : "Cours du Soir",
+  statutGrp: (val)       => val,
+  avcMin:    (val)       => val === "0.3" ? "AVC Critiques" : val === "0.5" ? "AVC Faibles" : "AVC Moyens",
+  search:    (val)       => `"${val}"`,
+};
+
 export default function Groupes() {
   const [data, setData]         = useState([]);
   const [meta, setMeta]         = useState(null);
@@ -26,16 +37,15 @@ export default function Groupes() {
   const [secteurs, setSecteurs] = useState([]);
   const [loading, setLoading]   = useState(true);
 
-  // Filtres
-  const [search, setSearch]         = useState("");
-  const [filiere, setFiliere]       = useState("");
-  const [secteur, setSecteur]       = useState("");
-  const [annee, setAnnee]           = useState("");
-  const [mode, setMode]             = useState("");
-  const [creneau, setCreneau]       = useState("");
-  const [statutGrp, setStatutGrp]   = useState("");
-  const [avcMin, setAvcMin]         = useState("");
-  const [page, setPage]             = useState(1);
+  const [search,    setSearch]    = useState("");
+  const [filiere,   setFiliere]   = useState("");
+  const [secteur,   setSecteur]   = useState("");
+  const [annee,     setAnnee]     = useState("");
+  const [mode,      setMode]      = useState("");
+  const [creneau,   setCreneau]   = useState("");
+  const [statutGrp, setStatutGrp] = useState("");
+  const [avcMin,    setAvcMin]    = useState("");
+  const [page,      setPage]      = useState(1);
 
   useEffect(() => {
     axios.get("/filieres-list").then(r => setFilieres(r.data)).catch(() => {});
@@ -58,7 +68,18 @@ export default function Groupes() {
     setMode(""); setCreneau(""); setStatutGrp(""); setAvcMin(""); setPage(1);
   };
 
-  const hasFilters = search || filiere || secteur || annee || mode || creneau || statutGrp || avcMin;
+  const activeFilters = [
+    search     && { key: "search",    val: search,    label: CHIP_LABELS.search(search),                        clear: () => setSearch("") },
+    secteur    && { key: "secteur",   val: secteur,   label: CHIP_LABELS.secteur(secteur, secteurs),            clear: () => { setSecteur(""); setFiliere(""); } },
+    filiere    && { key: "filiere",   val: filiere,   label: CHIP_LABELS.filiere(filiere, filieres),            clear: () => setFiliere("") },
+    annee      && { key: "annee",     val: annee,     label: CHIP_LABELS.annee(annee),                          clear: () => setAnnee("") },
+    mode       && { key: "mode",      val: mode,      label: CHIP_LABELS.mode(mode),                            clear: () => setMode("") },
+    creneau    && { key: "creneau",   val: creneau,   label: CHIP_LABELS.creneau(creneau),                      clear: () => setCreneau("") },
+    statutGrp  && { key: "statut",    val: statutGrp, label: CHIP_LABELS.statutGrp(statutGrp),                  clear: () => setStatutGrp("") },
+    avcMin     && { key: "avc",       val: avcMin,    label: CHIP_LABELS.avcMin(avcMin),                        clear: () => setAvcMin("") },
+  ].filter(Boolean);
+
+  const hasFilters = activeFilters.length > 0;
 
   return (
     <div>
@@ -75,117 +96,150 @@ export default function Groupes() {
       </div>
 
       <div className="table-card">
-        {/* ── FILTRES ── */}
-        <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", background: "var(--sl0)", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-
-          {/* Recherche */}
-          <div style={{ position: "relative" }}>
-            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--sl4)", display: "flex", pointerEvents: "none" }}>{Icons.search}</span>
-            <input className="search-input" style={{ paddingLeft: 32, width: 200 }} placeholder="Rechercher un groupe..."
-              value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+        {/* ── Filter panel ── */}
+        <div className="filter-panel-inline">
+          <div className="filter-panel-header">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--sl5)", display: "flex" }}>{Icons.filter}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)" }}>Filtres</span>
+              {activeFilters.length > 0 && (
+                <span style={{ background: "var(--g4)", color: "#111", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
+                  {activeFilters.length}
+                </span>
+              )}
+            </div>
+            {hasFilters && (
+              <button className="btn-reset" onClick={resetFilters}>
+                {Icons.close} Réinitialiser
+              </button>
+            )}
           </div>
 
-          {/* Secteur */}
-          <select className="form-select" style={{ width: 185, height: 36 }} value={secteur}
-            onChange={e => { setSecteur(e.target.value); setFiliere(""); setPage(1); }}>
-            <option value="">Tous les secteurs</option>
-            {secteurs.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
-          </select>
+          <div className="filter-row">
+            {/* Recherche */}
+            <div style={{ position: "relative", flex: "1 1 200px", minWidth: 160 }}>
+              <span className="search-icon">{Icons.search}</span>
+              <input className="search-input filter-input" placeholder="Rechercher un groupe..."
+                value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+            </div>
 
-          {/* Filière */}
-          <select className="form-select" style={{ width: 195, height: 36 }} value={filiere}
-            onChange={e => { setFiliere(e.target.value); setPage(1); }}>
-            <option value="">Toutes les filières</option>
-            {filieres.map(f => <option key={f.id} value={f.id}>{f.intitule}</option>)}
-          </select>
+            {/* Secteur */}
+            <select className="form-select filter-select" style={{ height: 36 }} value={secteur}
+              onChange={e => { setSecteur(e.target.value); setFiliere(""); setPage(1); }}>
+              <option value="">Tous les secteurs</option>
+              {secteurs.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+            </select>
 
-          {/* Année */}
-          <select className="form-select" style={{ width: 130, height: 36 }} value={annee}
-            onChange={e => { setAnnee(e.target.value); setPage(1); }}>
-            <option value="">Toutes années</option>
-            <option value="1">Année 1</option>
-            <option value="2">Année 2</option>
-            <option value="3">Année 3</option>
-          </select>
+            {/* Filière */}
+            <select className="form-select filter-select" style={{ height: 36 }} value={filiere}
+              onChange={e => { setFiliere(e.target.value); setPage(1); }}>
+              <option value="">Toutes les filières</option>
+              {filieres.map(f => <option key={f.id} value={f.id}>{f.intitule}</option>)}
+            </select>
 
-          {/* Mode */}
-          <select className="form-select" style={{ width: 145, height: 36 }} value={mode}
-            onChange={e => { setMode(e.target.value); setPage(1); }}>
-            <option value="">Tous les modes</option>
-            <option value="Résidentiel">Résidentiel</option>
-            <option value="Alterné">Alterné</option>
-          </select>
+            {/* Année */}
+            <select className="form-select filter-select" style={{ height: 36, width: 130 }} value={annee}
+              onChange={e => { setAnnee(e.target.value); setPage(1); }}>
+              <option value="">Toutes années</option>
+              <option value="1">Année 1</option>
+              <option value="2">Année 2</option>
+              <option value="3">Année 3</option>
+            </select>
 
-          {/* Créneau CDJ/CDS */}
-          <select className="form-select" style={{ width: 155, height: 36 }} value={creneau}
-            onChange={e => { setCreneau(e.target.value); setPage(1); }}>
-            <option value="">Tous les créneaux</option>
-            <option value="CDJ">Cours du Jour</option>
-            <option value="CDS">Cours du Soir</option>
-          </select>
+            {/* Mode */}
+            <select className="form-select filter-select" style={{ height: 36, width: 145 }} value={mode}
+              onChange={e => { setMode(e.target.value); setPage(1); }}>
+              <option value="">Tous les modes</option>
+              <option value="Résidentiel">Résidentiel</option>
+              <option value="Alterné">Alterné</option>
+            </select>
 
-          {/* Statut groupe */}
-          <select className="form-select" style={{ width: 130, height: 36 }} value={statutGrp}
-            onChange={e => { setStatutGrp(e.target.value); setPage(1); }}>
-            <option value="">Tous statuts</option>
-            <option value="Actif">Actif</option>
-            <option value="Inactif">Inactif</option>
-          </select>
+            {/* Créneau */}
+            <select className="form-select filter-select" style={{ height: 36, width: 155 }} value={creneau}
+              onChange={e => { setCreneau(e.target.value); setPage(1); }}>
+              <option value="">Tous les créneaux</option>
+              <option value="CDJ">Cours du Jour</option>
+              <option value="CDS">Cours du Soir</option>
+            </select>
 
-          {/* AVC critique filtre */}
-          <select className="form-select" style={{ width: 165, height: 36 }} value={avcMin}
-            onChange={e => { setAvcMin(e.target.value); setPage(1); }}>
-            <option value="">Tous AVC</option>
-            <option value="0.3">Critiques (AVC &lt; 30%)</option>
-            <option value="0.5">Faibles (AVC &lt; 50%)</option>
-            <option value="0.7">Moyens (AVC &lt; 70%)</option>
-          </select>
+            {/* Statut */}
+            <select className="form-select filter-select" style={{ height: 36, width: 130 }} value={statutGrp}
+              onChange={e => { setStatutGrp(e.target.value); setPage(1); }}>
+              <option value="">Tous statuts</option>
+              <option value="Actif">Actif</option>
+              <option value="Inactif">Inactif</option>
+            </select>
 
-          {hasFilters && (
-            <button className="btn-secondary" style={{ fontSize: 12, height: 36 }} onClick={resetFilters}>
-              {Icons.close} Réinitialiser
-            </button>
+            {/* AVC */}
+            <select className="form-select filter-select" style={{ height: 36, width: 165 }} value={avcMin}
+              onChange={e => { setAvcMin(e.target.value); setPage(1); }}>
+              <option value="">Tous AVC</option>
+              <option value="0.3">Critiques (AVC &lt; 30%)</option>
+              <option value="0.5">Faibles (AVC &lt; 50%)</option>
+              <option value="0.7">Moyens (AVC &lt; 70%)</option>
+            </select>
+          </div>
+
+          {/* Active filter chips */}
+          {activeFilters.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 8 }}>
+              {activeFilters.map(f => (
+                <span key={f.key} className="filter-chip">
+                  {f.label}
+                  <button className="filter-chip-close" onClick={() => { f.clear(); setPage(1); }}>{Icons.close}</button>
+                </span>
+              ))}
+            </div>
           )}
 
-          <span className="results-count" style={{ marginLeft: "auto" }}>{meta?.total ?? 0} résultat(s)</span>
+          <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 8 }}>
+            <span className="results-count">{meta?.total ?? 0} résultat(s)</span>
+          </div>
         </div>
 
-        {loading ? <div className="loader"><div className="loader-spinner" /><span>Chargement...</span></div>
-        : data.length === 0 ? (
-          <div className="empty"><div className="empty-icon">{Icons.groups}</div><div className="empty-title">Aucun groupe trouvé</div><div className="empty-desc">Modifiez les filtres</div></div>
+        {loading ? (
+          <div className="loader"><div className="loader-spinner" /><span>Chargement...</span></div>
+        ) : data.length === 0 ? (
+          <div className="empty">
+            <div className="empty-icon">{Icons.groups}</div>
+            <div className="empty-title">Aucun groupe trouvé</div>
+            <div className="empty-desc">Modifiez les filtres</div>
+          </div>
         ) : (
-          <table id="table-groupes">
-            <thead>
-              <tr>
-                <th>#</th><th>Groupe</th><th>Filière</th><th>Secteur</th>
-                <th>Année</th><th>Effectif</th><th>Mode</th><th>Créneau</th>
-                <th>Statut</th><th>AVC</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((g, i) => (
-                <tr key={g.id}>
-                  <td style={{ color: "var(--sl4)" }}>{(page - 1) * 15 + i + 1}</td>
-                  <td><strong style={{ color: "var(--sl8)" }}>{g.nom}</strong></td>
-                  <td style={{ fontSize: 12, color: "var(--sl6)", maxWidth: 160 }}>{g.filiere?.intitule || "—"}</td>
-                  <td style={{ fontSize: 11, color: "var(--sl5)" }}>{g.filiere?.secteur?.nom || "—"}</td>
-                  <td><span className="badge badge-info">Année {g.annee_formation}</span></td>
-                  <td><strong>{g.effectif}</strong></td>
-                  <td><span className={`badge ${g.mode === "Résidentiel" ? "badge-neutral" : "badge-purple"}`}>{g.mode || "—"}</span></td>
-                  <td style={{ fontSize: 12 }}>
-                    {g.creneau === "CDS"
-                      ? <span className="badge badge-warn">Soir</span>
-                      : g.creneau === "CDJ"
-                        ? <span className="badge badge-info">Jour</span>
-                        : "—"
-                    }
-                  </td>
-                  <td><span className={`badge ${g.statut === "Actif" ? "badge-ok" : "badge-off"}`}>{g.statut || "—"}</span></td>
-                  <td><AvcBar value={g.avc_moyen} /></td>
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table id="table-groupes" style={{ minWidth: 860 }}>
+              <thead>
+                <tr>
+                  <th>#</th><th>Groupe</th><th>Filière</th><th>Secteur</th>
+                  <th>Année</th><th>Effectif</th><th>Mode</th><th>Créneau</th>
+                  <th>Statut</th><th>AVC</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.map((g, i) => (
+                  <tr key={g.id}>
+                    <td style={{ color: "var(--sl4)" }}>{(page - 1) * 15 + i + 1}</td>
+                    <td><strong style={{ color: "var(--sl8)" }}>{g.nom}</strong></td>
+                    <td style={{ fontSize: 12, color: "var(--sl6)", maxWidth: 160 }}>{g.filiere?.intitule || "—"}</td>
+                    <td style={{ fontSize: 11, color: "var(--sl5)" }}>{g.filiere?.secteur?.nom || "—"}</td>
+                    <td><span className="badge badge-info">Année {g.annee_formation}</span></td>
+                    <td><strong>{g.effectif}</strong></td>
+                    <td><span className={`badge ${g.mode === "Résidentiel" ? "badge-neutral" : "badge-purple"}`}>{g.mode || "—"}</span></td>
+                    <td style={{ fontSize: 12 }}>
+                      {g.creneau === "CDS"
+                        ? <span className="badge badge-warn">Soir</span>
+                        : g.creneau === "CDJ"
+                          ? <span className="badge badge-info">Jour</span>
+                          : "—"
+                      }
+                    </td>
+                    <td><span className={`badge ${g.statut === "Actif" ? "badge-ok" : "badge-off"}`}>{g.statut || "—"}</span></td>
+                    <td><AvcBar value={g.avc_moyen} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {meta?.last_page > 1 && (

@@ -22,9 +22,7 @@ export default function Formateurs() {
   const fetchData = useCallback(() => {
     setLoading(true);
     axios.get("/formateurs", { params: { search, statut, page } })
-      .then(r => { setData(r.data.data || []); setMeta({ last_page: r.data.last_page, total: r.data.total });
-    console.log(r);
-     })
+      .then(r => { setData(r.data.data || []); setMeta({ last_page: r.data.last_page, total: r.data.total }); })
       .catch(() => flash("Erreur de chargement.", "err"))
       .finally(() => setLoading(false));
   }, [search, statut, page]);
@@ -54,6 +52,11 @@ export default function Formateurs() {
 
   const F = (f) => ({ value: form[f], onChange: e => setForm(p => ({ ...p, [f]: e.target.value })), className: "form-input" });
 
+  const hasFilters = !!(search || statut);
+  const activeCount = [search, statut].filter(Boolean).length;
+
+  const resetFilters = () => { setSearch(""); setStatut(""); setPage(1); };
+
   return (
     <div>
       <div className="pg-header">
@@ -79,28 +82,44 @@ export default function Formateurs() {
       )}
 
       <div className="table-card">
-        <div className="table-toolbar">
-          <div className="toolbar-filters">
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-light)", display: "flex", pointerEvents: "none" }}>
-                {Icons.search}
-              </span>
-              <input
-                className="search-input"
-                style={{ paddingLeft: 32 }}
-                placeholder="Rechercher par nom ou matricule..."
-                value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1); }}
-              />
+        {/* ── Filter panel ── */}
+        <div className="filter-panel-inline">
+          <div className="filter-panel-header">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--sl5)", display: "flex" }}>{Icons.search}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)" }}>Recherche & Filtres</span>
+              {activeCount > 0 && (
+                <span style={{ background: "var(--g4)", color: "#111", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
+                  {activeCount}
+                </span>
+              )}
             </div>
-            <select className="form-select" style={{ width: 150, height: 36 }} value={statut}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {hasFilters && (
+                <button className="btn-reset" onClick={resetFilters}>
+                  {Icons.close} Réinitialiser
+                </button>
+              )}
+              <span className="results-count">{meta?.total ?? 0} résultat(s)</span>
+            </div>
+          </div>
+
+          <div className="filter-row">
+            {/* Recherche */}
+            <div style={{ position: "relative", flex: "1 1 200px", minWidth: 160 }}>
+              <span className="search-icon">{Icons.search}</span>
+              <input className="search-input filter-input" placeholder="Rechercher par nom ou matricule..."
+                value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+            </div>
+
+            {/* Statut */}
+            <select className="form-select filter-select" style={{ height: 36, width: 160 }} value={statut}
               onChange={e => { setStatut(e.target.value); setPage(1); }}>
               <option value="">Tous les statuts</option>
               <option value="actif">Actif</option>
               <option value="inactif">Inactif</option>
             </select>
           </div>
-          <span className="results-count">{meta?.total ?? 0} résultat(s)</span>
         </div>
 
         {loading ? (
@@ -131,10 +150,15 @@ export default function Formateurs() {
                   </td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--indigo-50)", border: "1px solid var(--indigo-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "var(--indigo-600)", flexShrink: 0 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%",
+                        background: "var(--g0)", border: "1px solid var(--g1)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 12, fontWeight: 700, color: "var(--g6)", flexShrink: 0,
+                      }}>
                         {f.nom.split(" ").map(w => w[0]).join("").slice(0, 2)}
                       </div>
-                      <strong style={{ color: "var(--slate-800)", fontSize: 13.5 }}>{f.nom}</strong>
+                      <strong style={{ color: "var(--sl8)", fontSize: 13.5 }}>{f.nom}</strong>
                     </div>
                   </td>
                   <td>
@@ -169,7 +193,7 @@ export default function Formateurs() {
         )}
       </div>
 
-      {/* MODAL */}
+      {/* ── Modal ── */}
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal">
