@@ -4,6 +4,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\EmploiSeance;
 
 class EmploiDuTemps extends Model
 {
@@ -25,4 +26,5 @@ class EmploiDuTemps extends Model
 
     public function groupe()   { return $this->belongsTo(Groupe::class); }
     public function createur() { return $this->belongsTo(User::class, 'created_by'); }
+    public function seances()  { return $this->hasMany(EmploiSeance::class, 'emploi_id'); }
 }

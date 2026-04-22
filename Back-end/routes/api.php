@@ -1,5 +1,5 @@
 <?php
-// routes/api.php — VERSION FINALE
+// routes/api.php
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ImportController;
@@ -8,9 +8,10 @@ use App\Http\Controllers\FormateurController;
 use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\PoleController;
-use App\Http\Controllers\AlerteController; 
+use App\Http\Controllers\AlerteController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\EmploiController;
+use App\Http\Controllers\SalleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
@@ -26,7 +27,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/stats',                     [UserController::class, 'stats']);
         Route::apiResource('users',              UserController::class);
 
-        // ✅ /formateurs/all DOIT être en PREMIER avant {formateur}
         Route::get('/formateurs/all',            [FormateurController::class, 'all']);
         Route::get('/formateurs',                [FormateurController::class, 'index']);
         Route::post('/formateurs',               [FormateurController::class, 'store']);
@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/filieres-list',             [GroupeController::class, 'filieresList']);
         Route::get('/modules-list',              [ModuleController::class, 'index']);
         Route::post('/import/base-plate',        [ImportController::class, 'import']);
+        Route::post('/import/salles',            [SalleController::class, 'import']);
         Route::get('/pole',                      [PoleController::class, 'index']);
         Route::get('/pole/{secteur}/groupes',    [PoleController::class, 'groupesSecteur']);
         Route::post('/pole/assign',              [PoleController::class, 'assign']);
@@ -58,86 +59,72 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ── PÔLE ──
+    Route::middleware('role:pole')->group(function () {
 
+        Route::put('/plannings/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
+        Route::post('/plannings/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
 
-   Route::middleware('role:pole')->group(function () {
+        // Emplois du temps
+        Route::prefix('emplois')->group(function () {
+            Route::get('/',                                    [EmploiController::class, 'index']);
+            Route::post('/',                                   [EmploiController::class, 'store']);
+            Route::post('/generate-from-plannings',            [EmploiController::class, 'generateFromPlannings']);
+            Route::get('/formateur/{formateurId}',             [EmploiController::class, 'formateurTimetable']); // ← before /{id}
+            Route::get('/{id}',                                [EmploiController::class, 'show']);
+            Route::put('/{id}',                                [EmploiController::class, 'update']);
+            Route::delete('/{id}',                             [EmploiController::class, 'destroy']);
+        });
 
-    // // ── PLANNINGS ──
-    // Route::get('/plannings',                              [PlanningController::class, 'index']);
-    // Route::post('/plannings',                             [PlanningController::class, 'store']);
-    // Route::delete('/plannings/{planning}',                [PlanningController::class, 'destroy']);
+        // Plannings
+        Route::prefix('plannings')->group(function () {
+            Route::get('/',                               [PlanningController::class, 'index']);
+            Route::post('/',                              [PlanningController::class, 'store']);
+            Route::put('/{planning}',                     [PlanningController::class, 'update']);
+            Route::delete('/{planning}',                  [PlanningController::class, 'destroy']);
+            Route::put('/{planning}/semaine',             [PlanningController::class, 'updateSemaine']);
+            Route::post('/{planning}/auto-distribuer',    [PlanningController::class, 'autoDistribuerRoute']);
+        });
 
-    // Modifier une case semaine
-    Route::put('/plannings/{planning}/semaine',           [PlanningController::class, 'updateSemaine']);
+        // Salles — /salles/disponibles MUST come before /salles/{id}
+        Route::get('/salles/disponibles', [SalleController::class, 'disponibles']);
+        Route::get('/salles',             [SalleController::class, 'index']);
+        Route::post('/salles',            [SalleController::class, 'store']);
 
-    // Auto-distribuer
-    Route::post('/plannings/{planning}/auto-distribuer',  [PlanningController::class, 'autoDistribuerRoute']);
+        // Groupes pour le modal planning
+        Route::get('/pole-groupes', function () {
+            $groupes = DB::table('groupes')
+                ->select('groupes.id', 'groupes.nom',
+                    DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere"))
+                ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+                ->orderBy('groupes.nom')
+                ->get();
+            return response()->json(['data' => $groupes]);
+        });
 
-    // Emplois du temps
+        // Formateurs pour le modal
+        Route::get('/pole-formateurs', function () {
+            $formateurs = DB::table('formateurs')
+                ->select('id', 'nom')
+                ->orderBy('nom')
+                ->get();
+            return response()->json(['data' => $formateurs]);
+        });
 
- 
-// Emplois du temps
-Route::prefix('emplois')->group(function () {
-    Route::get('/',                         [EmploiController::class, 'index']);
-    Route::post('/',                        [EmploiController::class, 'store']);
-    Route::post('/generate-from-plannings', [EmploiController::class, 'generateFromPlannings']); // ← NOUVEAU
-    Route::get('/{id}',                     [EmploiController::class, 'show']);
-    Route::put('/{id}',                     [EmploiController::class, 'update']);
-    Route::delete('/{id}',                  [EmploiController::class, 'destroy']);
-});
- 
-// Plannings
-Route::prefix('plannings')->group(function () {
-    Route::get('/',                          [PlanningController::class, 'index']);
-    Route::post('/',                         [PlanningController::class, 'store']);
-    Route::put('/{planning}',               [PlanningController::class, 'update']);
-    Route::delete('/{planning}',            [PlanningController::class, 'destroy']);
-    Route::put('/{planning}/semaine',       [PlanningController::class, 'updateSemaine']);
-    Route::post('/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
-});
-    // Groupes pour le modal planning
-    Route::get('/pole-groupes', function () {
-        $groupes = DB::table('groupes')
-            ->select('groupes.id', 'groupes.nom',
-                DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere"))
-            ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id')
-            ->orderBy('groupes.nom')
-            ->get();
-        return response()->json(['data' => $groupes]);
+        // Modules filtrés par groupe_id
+        Route::get('/pole-modules', function (\Illuminate\Http\Request $request) {
+            $query = DB::table('modules')
+                ->select('id', 'intitule', 'code', 'semestre', 'mh_drif', 'formateur_id', 'eg_et');
+
+            if ($request->filled('groupe_id')) {
+                $query->where('groupe_id', $request->groupe_id);
+            }
+
+            return response()->json([
+                'data' => $query->orderBy('semestre')->orderBy('intitule')->get(),
+            ]);
+        });
     });
 
-    // Formateurs pour le modal
-    Route::get('/pole-formateurs', function () {
-        $formateurs = DB::table('formateurs')
-            ->select('id', 'nom')
-            ->orderBy('nom')
-            ->get();
-        return response()->json(['data' => $formateurs]);
-    });
-
-    // Modules filtrés par groupe_id
-
-Route::get('/pole-modules', function (\Illuminate\Http\Request $request) {
-    $query = DB::table('modules')
-        ->select(
-            'id',
-            'intitule',
-            'code',
-            'semestre',
-            'mh_drif',
-            'formateur_id',  // ← pour auto-fill formateur dans le modal
-            'eg_et',
-        );
- 
-    if ($request->filled('groupe_id')) {
-        $query->where('groupe_id', $request->groupe_id);
-    }
- 
-    return response()->json([
-        'data' => $query->orderBy('semestre')->orderBy('intitule')->get()]);
-});
-   });
-   Route::put('/plannings/{planning}', [PlanningController::class, 'update']);
-
+    Route::put('/plannings/{planning}', [PlanningController::class, 'update']);
     Route::get('/emploi-temps/view', fn() => response()->json(['page' => 'Voir EDT']));
 });

@@ -1,27 +1,28 @@
 <?php
-// ============================================================
-// app/Http/Controllers/EmploiController.php
-// ============================================================
 
 namespace App\Http\Controllers;
 
-use App\Models\Groupe;
-use App\Models\Planning;
 use App\Models\EmploiDuTemps;
+use App\Models\EmploiSeance;
+use App\Models\Formateur;
+use App\Models\Planning;
+use App\Models\Salle;
+use App\Services\ClassroomConflictService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class EmploiController extends Controller
 {
-    // ─────────────────────────────────────────────────────────
-    // Séances disponibles (même config que le frontend)
-    // ─────────────────────────────────────────────────────────
     const SEANCES_COUNT = 4;
-    const JOURS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
-    /**
-     * GET /api/emplois
-     */
-    public function index(Request $request)
+    public function __construct(private ClassroomConflictService $conflictService) {}
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/emplois
+    // ─────────────────────────────────────────────────────────────────────────
+    public function index()
     {
         $emplois = EmploiDuTemps::with('groupe')
             ->orderByDesc('created_at')
@@ -38,43 +39,61 @@ class EmploiController extends Controller
         return response()->json(['data' => $emplois]);
     }
 
-    /**
-     * POST /api/emplois
-     * Créer un emploi du temps (depuis le frontend — grille fournie)
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/emplois
+    // ─────────────────────────────────────────────────────────────────────────
     public function store(Request $request)
     {
         $request->validate([
             'groupe_id'  => 'required|exists:groupes,id',
             'date_debut' => 'required|date',
-            'semestre'   => 'nullable|string',
+            'semestre'   => 'required|in:S1,S2',
             'grille'     => 'required|array',
         ]);
 
-        $emploi = EmploiDuTemps::create([
-            'groupe_id'     => $request->groupe_id,
-            'created_by'    => $request->user()->id,
-            'periode_debut' => $request->date_debut,
-            'semestre'      => $request->semestre,
-            'grille'        => $request->grille,   // cast 'array' => auto json_encode
-            'valide'        => false,
-        ]);
+        $seances = $this->parseGrille($request->grille, $request->semestre);
+
+        // Pre-flight conflict check (application layer)
+        $conflicts = $this->conflictService->checkConflicts($seances);
+        if (!empty($conflicts)) {
+            return response()->json([
+                'message'   => 'Conflits de salles détectés.',
+                'conflicts' => array_column($conflicts, 'message'),
+            ], 422);
+        }
+
+        try {
+            $emploi = DB::transaction(function () use ($request, $seances) {
+                $emploi = EmploiDuTemps::create([
+                    'groupe_id'     => $request->groupe_id,
+                    'created_by'    => $request->user()->id,
+                    'periode_debut' => $request->date_debut,
+                    'semestre'      => $request->semestre,
+                    'grille'        => $request->grille,
+                    'valide'        => false,
+                ]);
+
+                foreach ($seances as $s) {
+                    EmploiSeance::create(['emploi_id' => $emploi->id] + $s);
+                }
+
+                return $emploi;
+            });
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Conflit de salle détecté au niveau base de données. Veuillez vérifier votre emploi du temps.',
+                ], 409);
+            }
+            throw $e;
+        }
 
         return response()->json(['data' => $emploi->load('groupe')], 201);
     }
 
-    /**
-     * POST /api/emplois/generate-from-plannings
-     * Génère automatiquement la grille depuis les plannings d'un groupe
-     * Body: { groupe_id, semestre, date_debut }
-     *
-     * Algorithme :
-     *  - Récupère tous les plannings du groupe pour le semestre donné
-     *  - Pour chaque module, calcule le nb de séances/semaine
-     *    (charge_hebdo / 2.5h par séance, min 1)
-     *  - Remplit les créneaux dans l'ordre Lundi→Samedi, Séance 1→4
-     *  - Crée l'emploi du temps et retourne la grille
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/emplois/generate-from-plannings
+    // ─────────────────────────────────────────────────────────────────────────
     public function generateFromPlannings(Request $request)
     {
         $request->validate([
@@ -83,9 +102,6 @@ class EmploiController extends Controller
             'date_debut' => 'required|date',
         ]);
 
-        $semestreNum = $request->semestre === 'S2' ? 2 : 1;
-
-        // Récupérer les plannings du groupe + semestre
         $plannings = Planning::with(['module', 'formateur'])
             ->where('groupe_id', $request->groupe_id)
             ->where('semestre', $request->semestre)
@@ -97,13 +113,11 @@ class EmploiController extends Controller
             ], 422);
         }
 
-        // Construire la grille vide
         $grille = [];
         foreach (self::JOURS as $jour) {
             $grille[$jour] = array_fill(0, self::SEANCES_COUNT, null);
         }
 
-        // File de créneaux libres
         $creneaux = [];
         foreach (self::JOURS as $jour) {
             for ($si = 0; $si < self::SEANCES_COUNT; $si++) {
@@ -118,7 +132,6 @@ class EmploiController extends Controller
             $nbSeances   = max(1, (int) round($chargeHebdo / 2.5));
 
             for ($s = 0; $s < $nbSeances; $s++) {
-                // Trouver le prochain créneau libre
                 while ($idx < count($creneaux) && $grille[$creneaux[$idx]['jour']][$creneaux[$idx]['si']] !== null) {
                     $idx++;
                 }
@@ -127,16 +140,16 @@ class EmploiController extends Controller
                 ['jour' => $jour, 'si' => $si] = $creneaux[$idx];
 
                 $grille[$jour][$si] = [
-                    'module'     => $p->module?->intitule ?? $p->module?->code ?? "Module {$p->module_id}",
-                    'formateur'  => $p->formateur?->nom ?? "—",
-                    'salle'      => '',
-                    'mode'       => 'PRESENTIEL',
+                    'module'    => $p->module?->intitule ?? $p->module?->code ?? "Module {$p->module_id}",
+                    'formateur' => $p->formateur?->nom ?? '—',
+                    'salle'     => '',
+                    'salle_id'  => null,
+                    'mode'      => 'PRESENTIEL',
                 ];
                 $idx++;
             }
         }
 
-        // Créer l'emploi du temps en base
         $emploi = EmploiDuTemps::create([
             'groupe_id'     => $request->groupe_id,
             'created_by'    => $request->user()->id,
@@ -153,9 +166,9 @@ class EmploiController extends Controller
         ], 201);
     }
 
-    /**
-     * GET /api/emplois/{id}
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/emplois/{id}
+    // ─────────────────────────────────────────────────────────────────────────
     public function show($id)
     {
         $emploi = EmploiDuTemps::with('groupe')->findOrFail($id);
@@ -169,27 +182,136 @@ class EmploiController extends Controller
                 'semestre'     => $emploi->semestre,
                 'periodeDebut' => $emploi->periode_debut?->format('d/m/Y'),
                 'valide'       => $emploi->valide,
-                'jours'        => $emploi->grille, // la grille indexée par jour
+                'jours'        => $emploi->grille,
             ]
         ]);
     }
 
-    /**
-     * PUT /api/emplois/{id}
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUT /api/emplois/{id}
+    // ─────────────────────────────────────────────────────────────────────────
     public function update(Request $request, $id)
     {
         $emploi = EmploiDuTemps::findOrFail($id);
-        $emploi->update($request->only(['grille', 'valide', 'periode_debut']));
-        return response()->json(['data' => $emploi]);
+
+        // If grille is being updated, re-validate and re-sync seances
+        if ($request->has('grille')) {
+            $semestre = $request->semestre ?? $emploi->semestre;
+            $seances  = $this->parseGrille($request->grille, $semestre);
+
+            $conflicts = $this->conflictService->checkConflicts($seances, $emploi->id);
+            if (!empty($conflicts)) {
+                return response()->json([
+                    'message'   => 'Conflits de salles détectés.',
+                    'conflicts' => array_column($conflicts, 'message'),
+                ], 422);
+            }
+
+            try {
+                DB::transaction(function () use ($emploi, $request, $seances, $semestre) {
+                    $emploi->seances()->delete();
+                    $emploi->update([
+                        'grille'   => $request->grille,
+                        'semestre' => $semestre,
+                        'valide'   => $request->valide ?? $emploi->valide,
+                    ]);
+                    foreach ($seances as $s) {
+                        EmploiSeance::create(['emploi_id' => $emploi->id] + $s);
+                    }
+                });
+            } catch (QueryException $e) {
+                if ($e->getCode() === '23000') {
+                    return response()->json([
+                        'message' => 'Conflit de salle détecté au niveau base de données.',
+                    ], 409);
+                }
+                throw $e;
+            }
+        } else {
+            $emploi->update($request->only(['valide', 'periode_debut']));
+        }
+
+        return response()->json(['data' => $emploi->fresh()]);
     }
 
-    /**
-     * DELETE /api/emplois/{id}
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // DELETE /api/emplois/{id}
+    // ─────────────────────────────────────────────────────────────────────────
     public function destroy($id)
     {
-        EmploiDuTemps::findOrFail($id)->delete();
+        EmploiDuTemps::findOrFail($id)->delete(); // seances cascade-deleted
         return response()->json(['message' => 'Emploi du temps supprimé.']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/emplois/formateur/{formateurId}
+    // Aggregates all emplois grilles to build the formateur's weekly timetable
+    // ─────────────────────────────────────────────────────────────────────────
+    public function formateurTimetable($formateurId)
+    {
+        $formateur = Formateur::findOrFail($formateurId);
+
+        $grille = [];
+        foreach (self::JOURS as $jour) {
+            $grille[$jour] = array_fill(0, self::SEANCES_COUNT, null);
+        }
+
+        EmploiDuTemps::with('groupe')->get()->each(function ($emploi) use (&$grille, $formateur, $formateurId) {
+            if (!is_array($emploi->grille)) return;
+            foreach (self::JOURS as $jour) {
+                foreach (($emploi->grille[$jour] ?? []) as $si => $cell) {
+                    if (!$cell) continue;
+                    $byId   = !empty($cell['formateur_id']) && (int)$cell['formateur_id'] === (int)$formateurId;
+                    $byName = !$byId && !empty($cell['formateur'])
+                              && mb_strtolower(trim($cell['formateur'])) === mb_strtolower(trim($formateur->nom));
+                    if (!$byId && !$byName) continue;
+                    if ($grille[$jour][$si] !== null) continue; // slot already filled (shouldn't happen)
+                    $grille[$jour][$si] = [
+                        'module' => $cell['module'] ?? '—',
+                        'groupe' => $emploi->groupe?->nom ?? '?',
+                        'salle'  => $cell['salle']  ?? '',
+                        'mode'   => $cell['mode']   ?? 'PRESENTIEL',
+                    ];
+                }
+            }
+        });
+
+        return response()->json([
+            'data' => [
+                'formateur' => ['id' => $formateur->id, 'nom' => $formateur->nom],
+                'grille'    => $grille,
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRIVATE: Parse grille JSON → flat seances array for DB insert / checking
+    // ─────────────────────────────────────────────────────────────────────────
+    private function parseGrille(array $grille, string $semestre): array
+    {
+        $seances = [];
+
+        foreach (self::JOURS as $jour) {
+            $cells = $grille[$jour] ?? [];
+            foreach ($cells as $si => $cell) {
+                // Distanciel = no physical room needed → skip conflict tracking
+                if (empty($cell) || ($cell['mode'] ?? '') === 'DISTANCIEL' || empty($cell['salle_id'])) continue;
+
+                $salle = Salle::find($cell['salle_id']);
+                if (!$salle) continue;
+
+                $seances[] = [
+                    'salle_id'      => $salle->id,
+                    'module_id'     => $cell['module_id']    ?? null,
+                    'formateur_id'  => $cell['formateur_id'] ?? null,
+                    'jour'          => $jour,
+                    'numero_seance' => (int) $si,
+                    'semestre'      => $semestre,
+                    'mode'          => $cell['mode'] ?? 'PRESENTIEL',
+                ];
+            }
+        }
+
+        return $seances;
     }
 }

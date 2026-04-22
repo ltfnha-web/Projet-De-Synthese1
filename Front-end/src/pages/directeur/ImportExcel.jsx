@@ -2,6 +2,139 @@ import { useState, useRef } from "react";
 import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
 
+const SALLE_COLUMNS = [
+  { col: "TYPE DE SALLE", desc: "Atelier / Salle de Cours / Salle Spécialisée" },
+  { col: "CODE SALLE",    desc: "Identifiant de la salle (obligatoire)" },
+  { col: "EFP ESPACE",    desc: "Établissement / espace (optionnel)" },
+];
+
+function ImportSalles() {
+  const [file, setFile]     = useState(null);
+  const [dragging, setDrag] = useState(false);
+  const [loading, setLoad]  = useState(false);
+  const [result, setResult] = useState(null);
+  const inputRef            = useRef();
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDrag(false);
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  };
+
+  const handleSubmit = async () => {
+    if (!file) return;
+    setLoad(true); setResult(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const { data } = await axios.post("/import/salles", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setResult({ success: true, ...data });
+      setFile(null);
+    } catch (e) {
+      setResult({ success: false, message: e.response?.data?.message || "Erreur lors de l'import." });
+    } finally { setLoad(false); }
+  };
+
+  return (
+    <div className="table-card" style={{ marginTop: 24 }}>
+      <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", background: "var(--sl0)", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#0891b2" }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)" }}>Import Salles (Excel / CSV)</div>
+      </div>
+      <div style={{ padding: "20px 18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+
+        {/* Colonnes attendues */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--sl5)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>
+            Colonnes attendues dans le fichier
+          </div>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            {SALLE_COLUMNS.map((c, i) => (
+              <div key={i} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "9px 14px",
+                borderBottom: i < SALLE_COLUMNS.length - 1 ? "1px solid var(--sl1)" : "none",
+                background: i % 2 === 0 ? "var(--surface)" : "var(--sl0)",
+              }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0891b2", fontFamily: "var(--font-mono)" }}>{c.col}</span>
+                <span style={{ fontSize: 11.5, color: "var(--sl5)" }}>{c.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--sl4)", marginTop: 8 }}>
+            Les salles déjà existantes (même nom) sont ignorées automatiquement.
+          </div>
+        </div>
+
+        {/* Zone upload + résultat */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div
+            style={{
+              border: `2px dashed ${file ? "#059669" : dragging ? "#0891b2" : "var(--sl3)"}`,
+              borderRadius: 10, padding: "28px 20px", textAlign: "center", cursor: "pointer",
+              background: file ? "#f0fdf4" : dragging ? "#ecfeff" : "var(--sl0)", transition: "all .2s",
+            }}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+              onChange={e => setFile(e.target.files[0])} />
+            {file ? (
+              <>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", color: "#15803d" }}>{Icons.check}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#15803d", marginBottom: 3 }}>{file.name}</div>
+                <div style={{ fontSize: 11, color: "var(--sl5)" }}>Cliquer pour changer</div>
+              </>
+            ) : (
+              <>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--sl2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", color: "var(--sl5)" }}>{Icons.upload}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)", marginBottom: 4 }}>Glissez votre fichier ici</div>
+                <div style={{ fontSize: 11, color: "var(--sl5)" }}>.xlsx · .xls · .csv</div>
+              </>
+            )}
+          </div>
+
+          <button
+            className="btn-primary"
+            style={{ height: 40, fontSize: 13, justifyContent: "center", background: "#0891b2", opacity: (!file || loading) ? .6 : 1, cursor: (!file || loading) ? "not-allowed" : "pointer" }}
+            onClick={handleSubmit}
+            disabled={!file || loading}
+          >
+            {loading
+              ? <><div className="loader-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: "white" }} /> Importation…</>
+              : <>{Icons.upload} Importer les salles</>}
+          </button>
+
+          {result && (
+            <div style={{
+              padding: "12px 14px", borderRadius: 8,
+              background: result.success ? "#f0fdf4" : "#fff1f2",
+              border: `1px solid ${result.success ? "#bbf7d0" : "#fecdd3"}`,
+              fontSize: 13,
+            }}>
+              <div style={{ fontWeight: 700, color: result.success ? "#15803d" : "#dc2626", marginBottom: 4 }}>
+                {result.success ? "Import terminé" : "Erreur"}
+              </div>
+              <div style={{ color: "var(--sl6)", fontSize: 12 }}>{result.message}</div>
+              {result.success && (
+                <div style={{ marginTop: 8, display: "flex", gap: 16 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#059669" }}>{result.imported} ajoutée(s)</span>
+                  <span style={{ fontSize: 12, color: "var(--sl5)" }}>{result.skipped} ignorée(s)</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 const ENTITIES = [
   { key: "secteurs",   label: "Secteurs",    desc: "Domaines d'activité",          color: "#7c3aed" },
   { key: "filieres",   label: "Filières",    desc: "Programmes de formation",       color: "#1a5276" },
@@ -307,6 +440,8 @@ export default function ImportExcel() {
 
         </div>
       </div>
+
+      <ImportSalles />
     </div>
   );
 }
