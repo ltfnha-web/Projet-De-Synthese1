@@ -16,13 +16,12 @@ use Illuminate\Support\Facades\DB;
 class UserController extends Controller
 {
     /* ════════════════════════════════════════
-       CRUD UTILISATEURS
+       INDEX — liste paginée + counts par rôle
     ════════════════════════════════════════ */
 
     public function index(Request $request)
     {
         $query = User::with(['formateur', 'secteur'])
-            ->where('role', '!=', 'directeur')
             ->when($request->role,   fn($q) => $q->where('role', $request->role))
             ->when($request->search, fn($q) =>
                 $q->where(fn($q2) =>
@@ -30,21 +29,40 @@ class UserController extends Controller
                        ->orWhere('email', 'like', "%{$request->search}%")
                 )
             )
-            ->when($request->statut, fn($q) => $q->where('statut', $request->statut))
             ->latest();
 
-        return response()->json($query->paginate(15));
+        $paginated = $query->paginate(15);
+
+        // Compteurs globaux (indépendants des filtres) pour les KPI cards
+        $countsRaw = User::selectRaw('role, count(*) as total')
+            ->groupBy('role')
+            ->pluck('total', 'role');
+
+        $counts = [
+            'directeur' => $countsRaw['directeur'] ?? 0,
+            'formateur' => $countsRaw['formateur'] ?? 0,
+            'pole'      => $countsRaw['pole']      ?? 0,
+        ];
+
+        return response()->json(array_merge(
+            $paginated->toArray(),
+            ['counts' => $counts]
+        ));
     }
+
+    /* ════════════════════════════════════════
+       STORE
+    ════════════════════════════════════════ */
 
     public function store(Request $request)
     {
         $request->validate([
-            'name'          => 'required|string|max:100',
-            'email'         => 'required|email|unique:users,email',
-            'password'      => 'required|string|min:6|confirmed',
-            'role'          => 'required|in:directeur,formateur,pole',
-            'formateur_id'  => 'nullable|exists:formateurs,id|required_if:role,formateur',
-            'secteur_id'    => 'nullable|exists:secteurs,id|required_if:role,pole',
+            'name'         => 'required|string|max:100',
+            'email'        => 'required|email|unique:users,email',
+            'password'     => 'required|string|min:6|confirmed',
+            'role'         => 'required|in:directeur,formateur,pole',
+            'formateur_id' => 'nullable|exists:formateurs,id|required_if:role,formateur',
+            'secteur_id'   => 'nullable|exists:secteurs,id|required_if:role,pole',
         ]);
 
         $user = User::create([
@@ -61,20 +79,28 @@ class UserController extends Controller
         return response()->json($user->load(['formateur', 'secteur']), 201);
     }
 
+    /* ════════════════════════════════════════
+       SHOW
+    ════════════════════════════════════════ */
+
     public function show(User $user)
     {
         return response()->json($user->load(['formateur', 'secteur']));
     }
 
+    /* ════════════════════════════════════════
+       UPDATE
+    ════════════════════════════════════════ */
+
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name'          => 'required|string|max:100',
-            'email'         => 'required|email|unique:users,email,' . $user->id,
-            'password'      => 'nullable|string|min:6|confirmed',
-            'role'          => 'required|in:directeur,formateur,pole',
-            'formateur_id'  => 'nullable|exists:formateurs,id|required_if:role,formateur',
-            'secteur_id'    => 'nullable|exists:secteurs,id|required_if:role,pole',
+            'name'         => 'required|string|max:100',
+            'email'        => 'required|email|unique:users,email,' . $user->id,
+            'password'     => 'nullable|string|min:6|confirmed',
+            'role'         => 'required|in:directeur,formateur,pole',
+            'formateur_id' => 'nullable|exists:formateurs,id|required_if:role,formateur',
+            'secteur_id'   => 'nullable|exists:secteurs,id|required_if:role,pole',
         ]);
 
         $user->update([
@@ -92,6 +118,10 @@ class UserController extends Controller
         return response()->json($user->load(['formateur', 'secteur']));
     }
 
+    /* ════════════════════════════════════════
+       DESTROY
+    ════════════════════════════════════════ */
+
     public function destroy(Request $request, User $user)
     {
         if ($user->id === $request->user()->id) {
@@ -105,17 +135,12 @@ class UserController extends Controller
     }
 
     /* ════════════════════════════════════════
-       OPTIONS POUR LES DROPDOWNS DU MODAL
-       GET /api/users/options
-       Retourne :
-         - formateurs sans compte user
-         - secteurs sans responsable pole
+       OPTIONS — dropdowns modal
+       GET /api/users/options?editing_user_id=X
     ════════════════════════════════════════ */
 
     public function options(Request $request)
     {
-        // Formateurs qui n'ont pas encore de compte utilisateur
-        // (sauf si on est en mode édition et que le user courant est lié à ce formateur)
         $editingUserId = $request->query('editing_user_id');
 
         $formateursAvecCompte = User::where('role', 'formateur')
@@ -129,7 +154,6 @@ class UserController extends Controller
             ->orderBy('nom')
             ->get();
 
-        // Secteurs qui n'ont pas encore de responsable de pôle
         $secteursAvecCompte = User::where('role', 'pole')
             ->whereNotNull('secteur_id')
             ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
@@ -147,7 +171,7 @@ class UserController extends Controller
     }
 
     /* ════════════════════════════════════════
-       STATS — DASHBOARD
+       STATS — dashboard
     ════════════════════════════════════════ */
 
     public function stats(Request $request)
@@ -206,8 +230,8 @@ class UserController extends Controller
             ->groupBy('secteurs.id', 'secteurs.nom')
         );
 
-        if ($seuil === 'critique')     $avcParSecteurQ->havingRaw('avc_moyen < 0.30');
-        elseif ($seuil === 'risque')   $avcParSecteurQ->havingRaw('avc_moyen < 0.50');
+        if ($seuil === 'critique')   $avcParSecteurQ->havingRaw('avc_moyen < 0.30');
+        elseif ($seuil === 'risque') $avcParSecteurQ->havingRaw('avc_moyen < 0.50');
 
         $avcParSecteur = $avcParSecteurQ->orderByDesc('avc_moyen')->get();
 

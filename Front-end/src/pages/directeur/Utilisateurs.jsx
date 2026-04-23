@@ -6,9 +6,9 @@ import { Icons } from "../../components/admin/Icons";
    CONFIG RÔLES
 ════════════════════════════════════════ */
 const ROLE_CFG = {
-  directeur: { label: "Directeur", bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0", emoji: "🛡️" },
-  formateur: { label: "Formateur", bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe", emoji: "👨‍🏫" },
-  pole:      { label: "Pôle",      bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff", emoji: "🎯" },
+  directeur: { label: "Directeur", bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0", },
+  formateur: { label: "Formateur", bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe",  },
+  pole:      { label: "Pôle",      bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff", },
 };
 
 const AV_COLORS = {
@@ -42,6 +42,7 @@ function getInitials(name = "") {
 export default function Utilisateurs() {
   const [data, setData]       = useState([]);
   const [meta, setMeta]       = useState(null);
+  const [counts, setCounts]   = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
   const [filterRole, setRole] = useState("");
@@ -49,7 +50,7 @@ export default function Utilisateurs() {
   const [alert, setAlert]     = useState(null);
 
   /* Modal */
-  const [modal, setModal]   = useState(false);
+  const [modal, setModal]     = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving]   = useState(false);
   const [errors, setErrors]   = useState({});
@@ -75,15 +76,20 @@ export default function Utilisateurs() {
   const fetchData = useCallback(() => {
     setLoading(true);
     axios.get("/users", { params: { search, role: filterRole, page } })
-      .then(r => { setData(r.data.data || []); setMeta(r.data); })
+      .then(r => {
+        setData(r.data.data || []);
+        setMeta(r.data);
+        setCounts(r.data.counts || {});
+      })
       .catch(() => flash("Erreur de chargement.", "err"))
       .finally(() => setLoading(false));
   }, [search, filterRole, page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const fetchOptions = () => {
-    axios.get("/users/options").then(r => setOptions(r.data)).catch(() => {});
+  const fetchOptions = (userId = null) => {
+    const params = userId ? { editing_user_id: userId } : {};
+    axios.get("/users/options", { params }).then(r => setOptions(r.data)).catch(() => {});
   };
 
   /* ── Modal ── */
@@ -96,7 +102,7 @@ export default function Utilisateurs() {
   };
 
   const openEdit = (u) => {
-    fetchOptions();
+    fetchOptions(u.id);
     setEditing(u);
     setForm({
       name: u.name, email: u.email,
@@ -174,7 +180,7 @@ export default function Utilisateurs() {
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         {Object.entries(ROLE_CFG).map(([role, cfg]) => (
           <div key={role}
-            onClick={() => setRole(filterRole === role ? "" : role)}
+            onClick={() => { setRole(filterRole === role ? "" : role); setPage(1); }}
             style={{
               flex: "1 1 150px", display: "flex", alignItems: "center", gap: 12,
               padding: "14px 18px", borderRadius: 12, cursor: "pointer",
@@ -186,20 +192,13 @@ export default function Utilisateurs() {
               transition: "all .15s", userSelect: "none",
             }}
           >
-            <div style={{
-              width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-              background: cfg.color + "20", color: cfg.color,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 20,
-            }}>
-              {cfg.emoji}
-            </div>
+            
             <div>
               <div style={{
                 fontSize: 26, fontWeight: 800, color: cfg.color, lineHeight: 1,
                 fontFamily: "var(--font-hd)", fontVariantNumeric: "tabular-nums",
               }}>
-                {meta ? data.filter(u => u.role === role).length : "—"}
+                {counts[role] ?? "—"}
               </div>
               <div style={{ fontSize: 12, color: "var(--sl5)", marginTop: 2, fontWeight: 500 }}>
                 {cfg.label}s
@@ -216,7 +215,6 @@ export default function Utilisateurs() {
         <div className="filter-panel-inline">
           <div className="filter-panel-header">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: "var(--sl5)", display: "flex" }}>{Icons.search}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--sl7)" }}>Recherche & Filtres</span>
               {activeCount > 0 && (
                 <span style={{
@@ -270,7 +268,7 @@ export default function Utilisateurs() {
           </div>
         ) : data.length === 0 ? (
           <div className="empty">
-            <div className="empty-icon">{Icons.users}</div>
+  
             <div className="empty-title">Aucun utilisateur trouvé</div>
             <div className="empty-desc">
               Créez des comptes pour vos formateurs et responsables de pôle
@@ -329,7 +327,7 @@ export default function Utilisateurs() {
                       <td style={{ fontSize: 12.5, color: "var(--sl6)" }}>
                         {u.role === "formateur" && u.formateur ? (
                           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ color: "var(--sl4)", display: "flex" }}>{Icons.users}</span>
+  
                             {u.formateur.nom}
                             <span style={{ color: "var(--sl4)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
                               · {u.formateur.mle}
@@ -484,7 +482,7 @@ export default function Utilisateurs() {
                     fontSize: 12, color: "#92400e",
                     display: "flex", alignItems: "center", gap: 8,
                   }}>
-                    {Icons.warning}
+                    
                     Tous les formateurs actifs ont déjà un compte utilisateur.
                   </div>
                 ) : (
@@ -510,7 +508,6 @@ export default function Utilisateurs() {
                     fontSize: 12, color: "#92400e",
                     display: "flex", alignItems: "center", gap: 8,
                   }}>
-                    {Icons.warning}
                     Tous les secteurs ont déjà un responsable de pôle.
                   </div>
                 ) : (
@@ -533,7 +530,6 @@ export default function Utilisateurs() {
                 fontSize: 12.5, color: "var(--g6)",
                 display: "flex", alignItems: "center", gap: 8,
               }}>
-                {Icons.shield}
                 Ce compte aura accès complet au tableau de bord directeur.
               </div>
             )}
