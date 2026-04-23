@@ -49,13 +49,13 @@ class PlanningController extends Controller
                 'num'       => $num,
                 'semestre'  => $semestre,
                 'date_lundi'=> $current->toDateString(),
-                'label'     => 'S' . $num, // ex: S1, S12, S27...
+                'label'     => 'S' . $num,
             ];
 
             $current->addWeek();
             $num++;
 
-            if ($num > 50) break; // sécurité
+            if ($num > 50) break;
         }
 
         return $semaines;
@@ -80,34 +80,35 @@ class PlanningController extends Controller
             );
 
         $plannings = $query->get()->map(function ($p) use ($semaines) {
-            // Index des MH par semaine_num pour accès rapide
             $mhBySemaine = $p->semaines->pluck('mh_prevue', 'semaine_num');
 
             $totalPrevu   = $p->semaines->sum('mh_prevue');
             $mhRestante   = max(0, ($p->mh_drif ?? 0) - $totalPrevu);
 
             return [
-                'id'          => $p->id,
-                'groupe_id'   => $p->groupe_id,
-                'groupe_nom'  => $p->groupe?->nom ?? $p->groupe?->code ?? '—',
-                'module_id'   => $p->module_id,
-                'module_nom'  => $p->module?->intitule ?? '—',
-                'formateur_id'=> $p->formateur_id,
+                'id'           => $p->id,
+                'groupe_id'    => $p->groupe_id,
+                'groupe_nom'   => $p->groupe?->nom ?? $p->groupe?->code ?? '—',
+                'module_id'    => $p->module_id,
+                'module_nom'   => $p->module?->intitule ?? '—',
+                'formateur_id' => $p->formateur_id,
                 'formateur_nom'=> $p->formateur?->nom ?? '—',
-                'semestre'    => $p->semestre,
-                'mh_drif'     => $p->mh_drif ?? 0,
-                'mh_realisee' => $p->mh_realisee ?? 0,
-                'mh_restante' => $mhRestante,
-                'total_prevu' => $totalPrevu,
-                // Cases semaines : { "1": 3.5, "7": 2, ... }
-                'semaines'    => $mhBySemaine,
+                'semestre'     => $p->semestre,
+                'mh_drif'      => $p->mh_drif ?? 0,
+                'mh_realisee'  => $p->mh_realisee ?? 0,
+                'mh_restante'  => $mhRestante,
+                'total_prevu'  => $totalPrevu,
+                'type'         => $p->type ?? 'Régionale',   // ✅ FIX : champ type inclus
+                'mode'         => $p->mode ?? 'PRESENTIEL',
+                'charge_hebdo' => $p->charge_hebdo ?? 0,
+                'semaines'     => $mhBySemaine,
             ];
         });
 
         return response()->json([
-            'plannings'       => $plannings,
-            'semaines_annee'  => $semaines,
-            'annee_scolaire'  => ($annee ?? $this->getAnneeCourante()) . '-' . (($annee ?? $this->getAnneeCourante()) + 1),
+            'plannings'      => $plannings,
+            'semaines_annee' => $semaines,
+            'annee_scolaire' => ($annee ?? $this->getAnneeCourante()) . '-' . (($annee ?? $this->getAnneeCourante()) + 1),
         ]);
     }
 
@@ -123,13 +124,14 @@ class PlanningController extends Controller
             'formateur_id'  => 'required|exists:formateurs,id',
             'semestre'      => 'required|in:S1,S2',
             'mh_drif'       => 'required|integer|min:1',
-            'type'          => 'nullable|string',
+            'type'          => 'nullable|string|in:Régionale,Locale',  // ✅ FIX : validation type
             'mode'          => 'nullable|string',
             'charge_hebdo'  => 'nullable|numeric|min:0',
         ]);
 
         $planning = Planning::create([
             ...$validated,
+            'type'            => $validated['type'] ?? 'Régionale', // ✅ FIX : valeur par défaut
             'mh_realisee'     => 0,
             'semaines_faites' => 0,
             'statut'          => 'En cours',
@@ -157,7 +159,7 @@ class PlanningController extends Controller
             'mh_prevue'   => 'required|numeric|min:0',
         ]);
 
-        $semaines = self::getSemainesAnnee();
+        $semaines    = self::getSemainesAnnee();
         $semaineInfo = collect($semaines)->firstWhere('num', $request->semaine_num);
 
         PlanningSemaine::updateOrCreate(
@@ -171,7 +173,6 @@ class PlanningController extends Controller
             ]
         );
 
-        // Recalculer mh_realisee global (= somme toutes semaines)
         $totalPrevu = PlanningSemaine::where('planning_id', $planning->id)->sum('mh_prevue');
         $planning->update(['mh_realisee' => $totalPrevu]);
 
@@ -184,7 +185,6 @@ class PlanningController extends Controller
 
     // ────────────────────────────────────────────────────────────
     // POST /api/plannings/{id}/auto-distribuer
-    // Répartir automatiquement les MH sur les semaines du semestre
     // Body: { charge_hebdo: 3 }
     // ────────────────────────────────────────────────────────────
     public function autoDistribuerRoute(Request $request, Planning $planning)
@@ -211,8 +211,64 @@ class PlanningController extends Controller
     // ────────────────────────────────────────────────────────────
     public function destroy(Planning $planning)
     {
-        $planning->delete(); // cascade supprime les semaines
+        $planning->delete();
         return response()->json(['message' => 'Supprimé avec succès']);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // PUT /api/plannings/{id}
+    // ────────────────────────────────────────────────────────────
+    public function update(Request $request, $id)
+    {
+        $planning = Planning::with('semaines')->findOrFail($id);
+
+        $oldSemestre = $planning->semestre;
+        $newSemestre = $request->semestre;
+
+        // ✅ FIX : 'type' inclus dans la mise à jour
+        $planning->update([
+            'formateur_id' => $request->formateur_id,
+            'semestre'     => $newSemestre,
+            'mh_drif'      => $request->mh_drif,
+            'charge_hebdo' => $request->charge_hebdo ?? 0,
+            'type'         => $request->type ?? $planning->type,  // ✅ FIX
+        ]);
+
+        if ($oldSemestre !== $newSemestre) {
+
+            // step 1: éviter les collisions (décalage temporaire)
+            foreach ($planning->semaines as $semaine) {
+                $semaine->update([
+                    'semaine_num' => $semaine->semaine_num + 100
+                ]);
+            }
+
+            // step 2: appliquer le bon décalage
+            foreach ($planning->fresh()->semaines as $semaine) {
+
+                // S1 → S2
+                if ($oldSemestre === 'S1' && $newSemestre === 'S2') {
+                    $semaine->update([
+                        'semaine_num' => $semaine->semaine_num - 100 + 22,
+                        'semestre'    => 2,
+                    ]);
+                }
+
+                // S2 → S1
+                elseif ($oldSemestre === 'S2' && $newSemestre === 'S1') {
+                    $semaine->update([
+                        'semaine_num' => $semaine->semaine_num - 100 - 22,
+                        'semestre'    => 1,
+                    ]);
+                }
+            }
+        }
+
+        $updated = $planning->fresh()->load('semaines');
+
+        return response()->json([
+            'planning' => $updated
+        ]);
     }
 
     // ────────────────────────────────────────────────────────────
@@ -221,7 +277,7 @@ class PlanningController extends Controller
     private function autoDistribuer(Planning $planning, float $chargeHebdo): void
     {
         $semestres    = self::getSemainesAnnee();
-        $semestreCode = $planning->semestre; // 'S1' ou 'S2'
+        $semestreCode = $planning->semestre;
         $semestreNum  = $semestreCode === 'S2' ? 2 : 1;
 
         $semainesDuSemestre = collect($semestres)
@@ -246,13 +302,11 @@ class PlanningController extends Controller
             $mhRestante -= $mh;
         }
 
-        // Supprimer les anciennes et réinsérer
         PlanningSemaine::where('planning_id', $planning->id)->delete();
         if (!empty($rows)) {
             PlanningSemaine::insert($rows);
         }
 
-        // Update charge_hebdo + mh_realisee
         $totalPrevu = collect($rows)->sum('mh_prevue');
         $planning->update([
             'charge_hebdo' => $chargeHebdo,
@@ -265,54 +319,4 @@ class PlanningController extends Controller
         $now = Carbon::now();
         return $now->month >= 9 ? $now->year : $now->year - 1;
     }
-
-public function update(Request $request, $id)
-{
-    $planning = Planning::with('semaines')->findOrFail($id);
-
-    $oldSemestre = $planning->semestre;
-    $newSemestre = $request->semestre;
-
-    // update planning
-    $planning->update([
-        'formateur_id' => $request->formateur_id,
-        'semestre'     => $newSemestre,
-        'mh_drif'      => $request->mh_drif,
-        'charge_hebdo' => $request->charge_hebdo ?? 0,
-    ]);
-
-    if ($oldSemestre !== $newSemestre) {
-
-        // ⚠️ step 1: نحيدو collision (temporary shift)
-        foreach ($planning->semaines as $semaine) {
-            $semaine->update([
-                'semaine_num' => $semaine->semaine_num + 100
-            ]);
-        }
-
-        // ⚠️ step 2: نطبقو التحويل الصحيح
-        foreach ($planning->fresh()->semaines as $semaine) {
-
-            // S1 → S2
-            if ($oldSemestre === 'S1' && $newSemestre === 'S2') {
-                $semaine->update([
-                    'semaine_num' => $semaine->semaine_num - 100 + 22,
-                    'semestre'    => 2,
-                ]);
-            }
-
-            // S2 → S1
-            elseif ($oldSemestre === 'S2' && $newSemestre === 'S1') {
-                $semaine->update([
-                    'semaine_num' => $semaine->semaine_num - 100 - 22,
-                    'semestre'    => 1,
-                ]);
-            }
-        }
-    }
-
-    return response()->json([
-        'planning' => $planning->fresh()->load('semaines')
-    ]);
-}
 }

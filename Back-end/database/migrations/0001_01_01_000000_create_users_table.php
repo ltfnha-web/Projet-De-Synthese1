@@ -13,13 +13,16 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->string('password');
-            // Rôles: directeur, surveillant, formateur
             $table->enum('role', ['directeur', 'pole', 'formateur'])->default('formateur');
             $table->boolean('is_active')->default(true);
-             $table->string('specialite')->nullable();
+            $table->string('specialite')->nullable();
             $table->string('telephone')->nullable();
             $table->enum('statut', ['actif', 'inactif'])->default('actif');
+            $table->rememberToken();
             $table->timestamps();
+
+            // Ces 2 colonnes sont ajoutées APRÈS les tables formateurs/secteurs
+            // donc elles sont dans une migration séparée — voir add_links_to_users_table
         });
     }
 

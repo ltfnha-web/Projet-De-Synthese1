@@ -16,6 +16,11 @@ const NAV_MAIN = [
   { to: "/directeur/import",       label: "Import",          icon: "upload"    },
 ];
 
+// NOUVEAU : Espaces utilisateur
+const ESPACE_ITEMS = [
+  { to: "/directeur/utilisateurs",    label: "Utilisateur",     icon: "user"      },
+];
+
 function getInitials(name = "") {
   return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
@@ -26,10 +31,13 @@ export default function AdminLayout() {
   const location         = useLocation();
   const [navStats, setNavStats]   = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
   const menuRef = useRef(null);
 
   useEffect(() => {
     axios.get("/stats").then(r => setNavStats(r.data)).catch(() => {});
+    // Récupérer le nombre de notifications non lues
+    axios.get("/notifications/unread-count").then(r => setNotifCount(r.data.count || 0)).catch(() => {});
   }, []);
 
   // Close menu on outside click
@@ -76,6 +84,24 @@ export default function AdminLayout() {
               <span>{item.label}</span>
               {item.badge && alertCount > 0 && (
                 <span className="al-nav-badge">{alertCount > 99 ? "99+" : alertCount}</span>
+              )}
+            </NavLink>
+          ))}
+
+          {/* Séparateur visuel */}
+          <div className="al-nav-divider" />
+          
+          {/* Espace Utilisateur */}
+          {ESPACE_ITEMS.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => "al-nav-item" + (isActive ? " active" : "")}
+            >
+              <span className="al-nav-icon">{Icons[item.icon]}</span>
+              <span>{item.label}</span>
+              {item.badge && notifCount > 0 && (
+                <span className="al-nav-badge">{notifCount > 99 ? "99+" : notifCount}</span>
               )}
             </NavLink>
           ))}

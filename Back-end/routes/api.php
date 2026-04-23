@@ -24,8 +24,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── DIRECTEUR ──
     Route::middleware('role:directeur')->group(function () {
-        Route::get('/stats',                     [UserController::class, 'stats']);
-        Route::apiResource('users',              UserController::class);
+        Route::get('/stats', [UserController::class, 'stats']);
+
+        // ⚠️  /users/options DOIT être AVANT apiResource (sinon Laravel
+        //     interprète "options" comme un {user} et retourne 404)
+        Route::get('/users/options',         [UserController::class, 'options']);
+        Route::apiResource('users',          UserController::class);
 
         Route::get('/formateurs/all',            [FormateurController::class, 'all']);
         Route::get('/formateurs',                [FormateurController::class, 'index']);
@@ -66,26 +70,26 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Emplois du temps
         Route::prefix('emplois')->group(function () {
-            Route::get('/',                                    [EmploiController::class, 'index']);
-            Route::post('/',                                   [EmploiController::class, 'store']);
-            Route::post('/generate-from-plannings',            [EmploiController::class, 'generateFromPlannings']);
-            Route::get('/formateur/{formateurId}',             [EmploiController::class, 'formateurTimetable']); // ← before /{id}
-            Route::get('/{id}',                                [EmploiController::class, 'show']);
-            Route::put('/{id}',                                [EmploiController::class, 'update']);
-            Route::delete('/{id}',                             [EmploiController::class, 'destroy']);
+            Route::get('/',                         [EmploiController::class, 'index']);
+            Route::post('/',                        [EmploiController::class, 'store']);
+            Route::post('/generate-from-plannings', [EmploiController::class, 'generateFromPlannings']);
+            Route::get('/formateur/{formateurId}',  [EmploiController::class, 'formateurTimetable']);
+            Route::get('/{id}',                     [EmploiController::class, 'show']);
+            Route::put('/{id}',                     [EmploiController::class, 'update']);
+            Route::delete('/{id}',                  [EmploiController::class, 'destroy']);
         });
 
         // Plannings
         Route::prefix('plannings')->group(function () {
-            Route::get('/',                               [PlanningController::class, 'index']);
-            Route::post('/',                              [PlanningController::class, 'store']);
-            Route::put('/{planning}',                     [PlanningController::class, 'update']);
-            Route::delete('/{planning}',                  [PlanningController::class, 'destroy']);
-            Route::put('/{planning}/semaine',             [PlanningController::class, 'updateSemaine']);
-            Route::post('/{planning}/auto-distribuer',    [PlanningController::class, 'autoDistribuerRoute']);
+            Route::get('/',                            [PlanningController::class, 'index']);
+            Route::post('/',                           [PlanningController::class, 'store']);
+            Route::put('/{planning}',                  [PlanningController::class, 'update']);
+            Route::delete('/{planning}',               [PlanningController::class, 'destroy']);
+            Route::put('/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
+            Route::post('/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
         });
 
-        // Salles — /salles/disponibles MUST come before /salles/{id}
+        // Salles — disponibles MUST come before /{id}
         Route::get('/salles/disponibles', [SalleController::class, 'disponibles']);
         Route::get('/salles',             [SalleController::class, 'index']);
         Route::post('/salles',            [SalleController::class, 'store']);

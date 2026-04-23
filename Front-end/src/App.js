@@ -9,13 +9,13 @@ import EspaceStagiaire       from "./pages/EspaceStagiaire";
 import AdminLayout           from "./components/admin/AdminLayout";
 import DirecteurDashboard    from "./pages/directeur/Dashboard";
 import DirecteurFormateurs   from "./pages/directeur/Formateurs";
-import DirecteurSurveillants from "./pages/directeur/Surveillants";
 import DirecteurGroupes      from "./pages/directeur/Groupes";
 import DirecteurModules      from "./pages/directeur/Modules";
 import DirecteurImport       from "./pages/directeur/ImportExcel";
 import FormateurDashboard    from "./pages/formateur/Dashboard";
 import DirecteurPole         from "./pages/directeur/Pole";
 import DirecteurAlertes      from "./pages/directeur/Alertes";
+import DirecteurUtilisateurs from "./pages/directeur/Utilisateurs";
 
 // NOUVEAUX IMPORTS pour le rôle Pôle
 import PoleLayout            from "./pages/pole/PoleLayout";
@@ -61,6 +61,8 @@ export default function App() {
             <Route path="import"       element={<DirecteurImport />} />
             <Route path="alertes"      element={<DirecteurAlertes />} />
             <Route path="pole"         element={<DirecteurPole />} />
+            <Route path="pole"          element={<DirecteurPole />} />  
+            <Route path="utilisateurs"  element={<DirecteurUtilisateurs />} />  {/* ← AJOUT */}
           </Route>
 
          

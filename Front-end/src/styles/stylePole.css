@@ -212,7 +212,7 @@
   border-bottom: 1px solid var(--sp-border);
   font-size: 13px;
   color: var(--sp-dark);
-  transition: background 0.1s;
+  transition:  0.1s;
 }
 .sp-info-item:last-child { border-bottom: none; }
 .sp-info-item:hover { background: var(--sp-gray-100); }

@@ -1,8 +1,4 @@
 <?php
-// ============================================================
-// app/Models/User.php
-// MODIFICATION : zbid "pole" f fillable + helper isPole()
-// ============================================================
 
 namespace App\Models;
 
@@ -19,11 +15,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',        // directeur | surveillant | formateur | stagiaire | pole ← AJOUT
+        'role',           // directeur | surveillant | formateur | pole
         'is_active',
         'specialite',
         'telephone',
         'statut',
+        'formateur_id',   // lien vers formateurs.id (role formateur)
+        'secteur_id',     // lien vers secteurs.id   (role pole)
     ];
 
     protected $hidden = [
@@ -36,8 +34,19 @@ class User extends Authenticatable
         'is_active' => 'boolean',
     ];
 
+    // ── Relations ──
+    public function formateur()
+    {
+        return $this->belongsTo(Formateur::class, 'formateur_id');
+    }
+
+    public function secteur()
+    {
+        return $this->belongsTo(Secteur::class, 'secteur_id');
+    }
+
     // ── Helpers rôle ──
-    public function isDirecteur():   bool { return $this->role === 'directeur'; }
-    public function isFormateur():   bool { return $this->role === 'formateur'; }
-    public function isPole():        bool { return $this->role === 'pole'; }        // ← AJOUT
+    public function isDirecteur(): bool { return $this->role === 'directeur'; }
+    public function isFormateur(): bool { return $this->role === 'formateur'; }
+    public function isPole():      bool { return $this->role === 'pole'; }
 }

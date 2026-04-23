@@ -179,10 +179,13 @@ class EmploiController extends Controller
                 'groupe'       => $emploi->groupe?->nom ?? $emploi->groupe?->code ?? '—',
                 'groupe_id'    => $emploi->groupe_id,
                 'filiere'      => $emploi->groupe?->filiere ?? null,
+                'annee'        => $emploi->groupe?->annee ?? null,
                 'semestre'     => $emploi->semestre,
                 'periodeDebut' => $emploi->periode_debut?->format('d/m/Y'),
                 'valide'       => $emploi->valide,
                 'jours'        => $emploi->grille,
+                'nb_heures'    => $emploi->nb_heures ?? null,
+                'formateur_parrain' => $emploi->formateur_parrain ?? null,
             ]
         ]);
     }
@@ -245,7 +248,6 @@ class EmploiController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET /api/emplois/formateur/{formateurId}
-    // Aggregates all emplois grilles to build the formateur's weekly timetable
     // ─────────────────────────────────────────────────────────────────────────
     public function formateurTimetable($formateurId)
     {
@@ -265,7 +267,7 @@ class EmploiController extends Controller
                     $byName = !$byId && !empty($cell['formateur'])
                               && mb_strtolower(trim($cell['formateur'])) === mb_strtolower(trim($formateur->nom));
                     if (!$byId && !$byName) continue;
-                    if ($grille[$jour][$si] !== null) continue; // slot already filled (shouldn't happen)
+                    if ($grille[$jour][$si] !== null) continue;
                     $grille[$jour][$si] = [
                         'module' => $cell['module'] ?? '—',
                         'groupe' => $emploi->groupe?->nom ?? '?',
@@ -285,7 +287,7 @@ class EmploiController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PRIVATE: Parse grille JSON → flat seances array for DB insert / checking
+    // PRIVATE: Parse grille JSON → flat seances array
     // ─────────────────────────────────────────────────────────────────────────
     private function parseGrille(array $grille, string $semestre): array
     {
@@ -294,7 +296,6 @@ class EmploiController extends Controller
         foreach (self::JOURS as $jour) {
             $cells = $grille[$jour] ?? [];
             foreach ($cells as $si => $cell) {
-                // Distanciel = no physical room needed → skip conflict tracking
                 if (empty($cell) || ($cell['mode'] ?? '') === 'DISTANCIEL' || empty($cell['salle_id'])) continue;
 
                 $salle = Salle::find($cell['salle_id']);

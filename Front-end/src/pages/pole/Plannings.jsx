@@ -3,11 +3,10 @@ import axios from "axios";
 
 const NB_SEM = 23;
 
-// Helper pour afficher proprement une chaîne ou un objet
 function toStr(value) {
   if (value == null) return "";
   if (typeof value === "object") {
-    if (value.intitule) return toStr(value.intitule); // récursif au cas où
+    if (value.intitule) return toStr(value.intitule);
     if (value.code) return toStr(value.code);
     if (value.nom) return toStr(value.nom);
     if (value.label) return toStr(value.label);
@@ -37,7 +36,6 @@ const Ico = {
   gen:     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>,
 };
 
-// ── Séances et jours ─────────────────────────────────────────
 const SEANCES = [
   { label: "Séance 1", horaire: "08:30 → 11:00" },
   { label: "Séance 2", horaire: "11:00 → 13:30" },
@@ -122,10 +120,13 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
       semestre:     p.semestre ?? "S1",
       mh_drif:      p.mh_drif ?? "",
       charge_hebdo: p.charge_hebdo ?? "",
+      type:         p.type ?? "Régionale",  // ✅ FIX : type inclus dans editData
     });
     setEditing(true);
   };
+
   const cancelEdit = () => setEditing(false);
+
   const saveEdit = async () => {
     setSaving(true);
     try {
@@ -134,12 +135,14 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
         semestre:     editData.semestre,
         mh_drif:      parseInt(editData.mh_drif),
         charge_hebdo: editData.charge_hebdo !== "" ? parseFloat(editData.charge_hebdo) : p.charge_hebdo,
+        type:         editData.type,  // ✅ FIX : type envoyé au backend
       });
       onUpdate(p.id, res.data.planning ?? {
         formateur_id:  parseInt(editData.formateur_id),
         formateur_nom: formateurs.find(f => String(f.id) === String(editData.formateur_id))?.nom ?? p.formateur_nom,
         semestre:      editData.semestre,
         mh_drif:       parseInt(editData.mh_drif),
+        type:          editData.type,  // ✅ FIX : type mis à jour localement
       });
       setEditing(false);
     } catch (e) {
@@ -162,9 +165,13 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
 
   return (
     <tr style={{ borderBottom: "1px solid var(--sl1)", background: editing ? "rgba(26,82,118,.03)" : undefined }}>
+
+      {/* Groupe */}
       <td style={{ padding: "7px 14px", position: "sticky", left: 0, zIndex: 1, background: rowBg }}>
         <span style={{ fontWeight: 700, color: "var(--sl8)", fontSize: 12, whiteSpace: "nowrap" }}>{toStr(p.groupe_nom)}</span>
       </td>
+
+      {/* Module + Semestre */}
       <td style={{ padding: "7px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {editing ? (
@@ -178,6 +185,8 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
           <span style={{ fontSize: 11, color: "var(--sl6)" }}>{toStr(p.module_nom)}</span>
         </div>
       </td>
+
+      {/* Formateur */}
       <td style={{ padding: editing ? "5px 10px" : "7px 14px", whiteSpace: "nowrap", minWidth: 140 }}>
         {editing ? (
           <select style={selStyle} value={editData.formateur_id}
@@ -189,6 +198,8 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
           <span style={{ fontSize: 11, color: "var(--sl5)" }}>{toStr(p.formateur_nom)}</span>
         )}
       </td>
+
+      {/* MH DRIF */}
       <td style={{ textAlign: "center", whiteSpace: "nowrap", padding: editing ? "5px 6px" : undefined }}>
         {editing ? (
           <input style={{ ...inpStyle, width: 64, textAlign: "center" }} type="number" min="1"
@@ -198,31 +209,52 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
           <span style={{ fontWeight: 700, fontSize: 12, color: "var(--sl8)" }}>{p.mh_drif}h</span>
         )}
       </td>
+
+      {/* MH Restante */}
       <td style={{ textAlign: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: p.mh_restante > 0 ? "var(--rd5)" : "var(--em6)" }}>
           {p.mh_restante > 0 ? `${p.mh_restante}h` : "—"}
         </span>
       </td>
+
+      {/* Avancement */}
       <td style={{ padding: "0 10px", borderRight: "2px solid var(--border)" }}>
         <AvcBar mhDrif={p.mh_drif} totalPrevu={p.total_prevu} />
       </td>
-      <td style={{ textAlign: "center", padding: "4px 6px" }}>
-        <span style={{
-          display: "inline-block",
-          fontSize: 10, fontWeight: 700,
-          padding: "2px 7px", borderRadius: 20,
-          background: p.type === "Locale" ? "#fef3c7" : "#eff6ff",
-          color: p.type === "Locale" ? "#92400e" : "#1d4ed8",
-          border: `1px solid ${p.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
-        }}>
-          {p.type === "Locale" ? "L" : "R"}
-        </span>
+
+      {/* ✅ FIX : Type R/L — affichage statique OU select en mode édition */}
+      <td style={{ textAlign: "center", padding: editing ? "5px 6px" : "4px 6px" }}>
+        {editing ? (
+          <select
+            style={{ ...selStyle, width: 80 }}
+            value={editData.type}
+            onChange={e => setEditData(d => ({ ...d, type: e.target.value }))}
+          >
+            <option value="Régionale">R — Régionale</option>
+            <option value="Locale">L — Locale</option>
+          </select>
+        ) : (
+          <span style={{
+            display: "inline-block",
+            fontSize: 10, fontWeight: 700,
+            padding: "2px 7px", borderRadius: 20,
+            background: p.type === "Locale" ? "#fef3c7" : "#eff6ff",
+            color: p.type === "Locale" ? "#92400e" : "#1d4ed8",
+            border: `1px solid ${p.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
+          }}>
+            {p.type === "Locale" ? "L" : "R"}
+          </span>
+        )}
       </td>
+
+      {/* Cellules semaines */}
       {semainesAffichees.map(s => (
         <CellSemaine key={s.num} planningId={p.id} semaineNum={s.num}
           value={parseFloat(p.semaines?.[s.num]) || 0}
           planSemestre={p.semestre} cellSemestre={`S${s.semestre}`} onSave={onCellSave} />
       ))}
+
+      {/* Actions */}
       <td style={{ textAlign: "center", padding: "0 6px", whiteSpace: "nowrap" }}>
         {editing ? (
           <>
@@ -304,20 +336,20 @@ function PendingRow({ pm, idx, formateurs, groupeId, onCreate }) {
 
 // ── COMPOSANT PRINCIPAL ───────────────────────────────────────────────────────
 export default function Plannings() {
-  const [plannings, setPlannings]         = useState([]);
-  const [semainesAnnee, setSemainesAnnee] = useState([]);
-  const [anneeScolaire, setAnneeScolaire] = useState("");
-  const [loading, setLoading]             = useState(true);
-  const [alert, setAlert]                 = useState(null);
-  const [filterGroupe, setFilterGroupe]   = useState("");
+  const [plannings, setPlannings]           = useState([]);
+  const [semainesAnnee, setSemainesAnnee]   = useState([]);
+  const [anneeScolaire, setAnneeScolaire]   = useState("");
+  const [loading, setLoading]               = useState(true);
+  const [alert, setAlert]                   = useState(null);
+  const [filterGroupe, setFilterGroupe]     = useState("");
   const [filterSemestre, setFilterSemestre] = useState("");
-  const [groupes, setGroupes]             = useState([]);
-  const [modules, setModules]             = useState([]);
-  const [formateurs, setFormateurs]       = useState([]);
+  const [groupes, setGroupes]               = useState([]);
+  const [modules, setModules]               = useState([]);
+  const [formateurs, setFormateurs]         = useState([]);
   const FORM_INIT = { groupe_id: "", module_id: "", formateur_id: "", semestre: "S1", mh_drif: "", charge_hebdo: "", type: "Régionale", mode: "PRESENTIEL" };
-  const [modal, setModal]   = useState(false);
-  const [form, setForm]     = useState(FORM_INIT);
-  const [saving, setSaving] = useState(false);
+  const [modal, setModal]     = useState(false);
+  const [form, setForm]       = useState(FORM_INIT);
+  const [saving, setSaving]   = useState(false);
   const [pendingModules, setPendingModules] = useState({});
   const [autoModal, setAutoModal]   = useState(false);
   const [autoTarget, setAutoTarget] = useState(null);
@@ -422,7 +454,7 @@ export default function Plannings() {
         semestre:     form.semestre,
         mh_drif:      parseInt(form.mh_drif),
         charge_hebdo: form.charge_hebdo ? parseFloat(form.charge_hebdo) : undefined,
-        type:         form.type,
+        type:         form.type,   // ✅ toujours envoyé
         mode:         form.mode,
       });
       flash("Planning créé avec succès.");
@@ -722,6 +754,7 @@ export default function Plannings() {
         </div>
       )}
 
+      {/* ── Modal Nouveau Planning ── */}
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal" style={{ width: 540 }}>
@@ -802,7 +835,8 @@ export default function Plannings() {
               <div className="form-group">
                 <label className="form-label">Type</label>
                 <select className="form-select" value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
-                  <option>Régionale</option><option>Locale</option>
+                  <option value="Régionale">Régionale</option>
+                  <option value="Locale">Locale</option>
                 </select>
               </div>
               <div className="form-group">
@@ -823,6 +857,7 @@ export default function Plannings() {
         </div>
       )}
 
+      {/* ── Modal Auto-distribution ── */}
       {autoModal && autoTarget && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setAutoModal(false)}>
           <div className="modal" style={{ width: 420 }}>

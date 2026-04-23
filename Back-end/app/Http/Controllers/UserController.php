@@ -15,72 +15,81 @@ use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
+    /* ════════════════════════════════════════
+       CRUD UTILISATEURS
+    ════════════════════════════════════════ */
+
     public function index(Request $request)
     {
-        $query = User::where('role', '!=', 'directeur')
+        $query = User::with(['formateur', 'secteur'])
+            ->where('role', '!=', 'directeur')
             ->when($request->role,   fn($q) => $q->where('role', $request->role))
             ->when($request->search, fn($q) =>
                 $q->where(fn($q2) =>
-                    $q2->where('name',        'like', "%{$request->search}%")
-                       ->orWhere('email',      'like', "%{$request->search}%")
-                       ->orWhere('specialite', 'like', "%{$request->search}%")
+                    $q2->where('name',  'like', "%{$request->search}%")
+                       ->orWhere('email', 'like', "%{$request->search}%")
                 )
             )
             ->when($request->statut, fn($q) => $q->where('statut', $request->statut))
             ->latest();
 
-        return response()->json($query->paginate(10));
+        return response()->json($query->paginate(15));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'name'       => 'required|string|max:100',
-            'email'      => 'required|email|unique:users,email',
-            'password'   => 'required|string|min:6',
-            'role'       => 'required|in:formateur,surveillant',
-            'specialite' => 'nullable|string|max:150',
-            'telephone'  => 'nullable|string|max:20',
-            'statut'     => 'in:actif,inactif',
+            'name'          => 'required|string|max:100',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|string|min:6|confirmed',
+            'role'          => 'required|in:directeur,formateur,pole',
+            'formateur_id'  => 'nullable|exists:formateurs,id|required_if:role,formateur',
+            'secteur_id'    => 'nullable|exists:secteurs,id|required_if:role,pole',
         ]);
 
         $user = User::create([
-            'name'       => $request->name,
-            'email'      => $request->email,
-            'password'   => Hash::make($request->password),
-            'role'       => $request->role,
-            'is_active'  => true,
-            'specialite' => $request->specialite,
-            'telephone'  => $request->telephone,
-            'statut'     => $request->statut ?? 'actif',
+            'name'         => $request->name,
+            'email'        => $request->email,
+            'password'     => Hash::make($request->password),
+            'role'         => $request->role,
+            'is_active'    => true,
+            'statut'       => 'actif',
+            'formateur_id' => $request->role === 'formateur' ? $request->formateur_id : null,
+            'secteur_id'   => $request->role === 'pole'      ? $request->secteur_id   : null,
         ]);
 
-        return response()->json($user, 201);
+        return response()->json($user->load(['formateur', 'secteur']), 201);
     }
 
     public function show(User $user)
     {
-        return response()->json($user);
+        return response()->json($user->load(['formateur', 'secteur']));
     }
 
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name'       => 'required|string|max:100',
-            'email'      => 'required|email|unique:users,email,' . $user->id,
-            'role'       => 'required|in:formateur,surveillant',
-            'specialite' => 'nullable|string|max:150',
-            'telephone'  => 'nullable|string|max:20',
-            'statut'     => 'in:actif,inactif',
+            'name'          => 'required|string|max:100',
+            'email'         => 'required|email|unique:users,email,' . $user->id,
+            'password'      => 'nullable|string|min:6|confirmed',
+            'role'          => 'required|in:directeur,formateur,pole',
+            'formateur_id'  => 'nullable|exists:formateurs,id|required_if:role,formateur',
+            'secteur_id'    => 'nullable|exists:secteurs,id|required_if:role,pole',
         ]);
 
-        $user->update($request->only(['name', 'email', 'role', 'specialite', 'telephone', 'statut']));
+        $user->update([
+            'name'         => $request->name,
+            'email'        => $request->email,
+            'role'         => $request->role,
+            'formateur_id' => $request->role === 'formateur' ? $request->formateur_id : null,
+            'secteur_id'   => $request->role === 'pole'      ? $request->secteur_id   : null,
+        ]);
 
         if ($request->filled('password')) {
             $user->update(['password' => Hash::make($request->password)]);
         }
 
-        return response()->json($user);
+        return response()->json($user->load(['formateur', 'secteur']));
     }
 
     public function destroy(Request $request, User $user)
@@ -95,47 +104,71 @@ class UserController extends Controller
         return response()->json(['message' => 'Utilisateur supprimé.']);
     }
 
-    /**
-     * GET /api/stats
-     * Params optionnels :
-     *   ?secteur_id=1
-     *   ?creneau=CDJ|CDS
-     *   ?annee=1|2|3
-     *   ?seuil=critique|risque   (critique = AVC<30%, risque = AVC<50%)
-     */
+    /* ════════════════════════════════════════
+       OPTIONS POUR LES DROPDOWNS DU MODAL
+       GET /api/users/options
+       Retourne :
+         - formateurs sans compte user
+         - secteurs sans responsable pole
+    ════════════════════════════════════════ */
+
+    public function options(Request $request)
+    {
+        // Formateurs qui n'ont pas encore de compte utilisateur
+        // (sauf si on est en mode édition et que le user courant est lié à ce formateur)
+        $editingUserId = $request->query('editing_user_id');
+
+        $formateursAvecCompte = User::where('role', 'formateur')
+            ->whereNotNull('formateur_id')
+            ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
+            ->pluck('formateur_id');
+
+        $formateurs = Formateur::whereNotIn('id', $formateursAvecCompte)
+            ->where('statut', 'actif')
+            ->select('id', 'nom', 'mle')
+            ->orderBy('nom')
+            ->get();
+
+        // Secteurs qui n'ont pas encore de responsable de pôle
+        $secteursAvecCompte = User::where('role', 'pole')
+            ->whereNotNull('secteur_id')
+            ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
+            ->pluck('secteur_id');
+
+        $secteurs = Secteur::whereNotIn('id', $secteursAvecCompte)
+            ->select('id', 'nom')
+            ->orderBy('nom')
+            ->get();
+
+        return response()->json([
+            'formateurs' => $formateurs,
+            'secteurs'   => $secteurs,
+        ]);
+    }
+
+    /* ════════════════════════════════════════
+       STATS — DASHBOARD
+    ════════════════════════════════════════ */
+
     public function stats(Request $request)
     {
-        // ══════════════════════════════════════════
-        //  HELPERS — scope commun appliqué partout
-        // ══════════════════════════════════════════
         $secteurId = $request->secteur_id;
-        $creneau   = $request->creneau;        // CDJ | CDS | null
-        $annee     = $request->annee;           // 1 | 2 | 3 | null
-        $seuil     = $request->seuil;           // critique | risque | null
+        $creneau   = $request->creneau;
+        $annee     = $request->annee;
+        $seuil     = $request->seuil;
 
-        // Closure réutilisable pour appliquer les filtres sur modules+groupes
         $applyFilters = function ($query) use ($secteurId, $creneau, $annee) {
-            if ($secteurId) {
-                $query->where('filieres.secteur_id', $secteurId);
-            }
-            if ($creneau) {
-                $query->where('groupes.creneau', $creneau);
-            }
-            if ($annee) {
-                $query->where('groupes.annee_formation', $annee);
-            }
+            if ($secteurId) $query->where('filieres.secteur_id', $secteurId);
+            if ($creneau)   $query->where('groupes.creneau', $creneau);
+            if ($annee)     $query->where('groupes.annee_formation', $annee);
             return $query;
         };
 
-        // Base query modules → groupes → filieres → secteurs
         $baseQuery = fn() => DB::table('modules')
             ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id');
 
-        // ══════════════════════════════════════════
-        //  COMPTEURS (filtrés)
-        // ══════════════════════════════════════════
         $groupeScope = Groupe::join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
@@ -147,27 +180,19 @@ class UserController extends Controller
             ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
             ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee));
 
-        // Si pas de filtre → compteurs globaux rapides
         $totalFormateurs   = Formateur::count();
         $totalSurveillants = User::where('role', 'surveillant')->count();
-        $totalFilieres     = $secteurId
-            ? Filiere::where('secteur_id', $secteurId)->count()
-            : Filiere::count();
+        $totalFilieres     = $secteurId ? Filiere::where('secteur_id', $secteurId)->count() : Filiere::count();
         $totalSecteurs     = Secteur::count();
+        $totalGroupes      = (clone $groupeScope)->count('groupes.id');
+        $totalModules      = (clone $moduleScope)->count('modules.id');
+        $effectifTotal     = (clone $groupeScope)->sum('groupes.effectif');
 
-        $totalGroupes  = (clone $groupeScope)->count('groupes.id');
-        $totalModules  = (clone $moduleScope)->count('modules.id');
-        $effectifTotal = (clone $groupeScope)->sum('groupes.effectif');
-
-        // ── MH globales (filtrées) ──
         $mhRealisee = (clone $moduleScope)->sum('modules.mh_realisee_globale');
         $mhDrif     = (clone $moduleScope)->sum('modules.mh_drif');
         $mhRestante = (clone $moduleScope)->sum('modules.mh_restante');
         $avcMoyen   = $mhDrif > 0 ? $mhRealisee / $mhDrif : 0;
 
-        // ══════════════════════════════════════════
-        //  AVC PAR SECTEUR (filtré)
-        // ══════════════════════════════════════════
         $avcParSecteurQ = $applyFilters($baseQuery()
             ->select(
                 'secteurs.id as secteur_id',
@@ -181,18 +206,11 @@ class UserController extends Controller
             ->groupBy('secteurs.id', 'secteurs.nom')
         );
 
-        // Filtre seuil AVC sur les secteurs
-        if ($seuil === 'critique') {
-            $avcParSecteurQ->havingRaw('avc_moyen < 0.30');
-        } elseif ($seuil === 'risque') {
-            $avcParSecteurQ->havingRaw('avc_moyen < 0.50');
-        }
+        if ($seuil === 'critique')     $avcParSecteurQ->havingRaw('avc_moyen < 0.30');
+        elseif ($seuil === 'risque')   $avcParSecteurQ->havingRaw('avc_moyen < 0.50');
 
         $avcParSecteur = $avcParSecteurQ->orderByDesc('avc_moyen')->get();
 
-        // ══════════════════════════════════════════
-        //  DISTRIBUTION GROUPES (filtrée)
-        // ══════════════════════════════════════════
         $groupesAvc = $applyFilters($baseQuery()
             ->select(
                 'groupes.id',
@@ -215,9 +233,6 @@ class UserController extends Controller
             else              $distribution['critique']++;
         }
 
-        // ══════════════════════════════════════════
-        //  MH PAR FILIÈRE (filtrée, top 10)
-        // ══════════════════════════════════════════
         $mhParFiliereQ = $applyFilters($baseQuery()
             ->select(
                 'filieres.intitule as filiere',
@@ -230,21 +245,12 @@ class UserController extends Controller
             ->groupBy('filieres.intitule')
         );
 
-        if ($seuil === 'critique') {
-            $mhParFiliereQ->havingRaw('avc_filiere < 0.30');
-        } elseif ($seuil === 'risque') {
-            $mhParFiliereQ->havingRaw('avc_filiere < 0.50');
-        }
+        if ($seuil === 'critique')   $mhParFiliereQ->havingRaw('avc_filiere < 0.30');
+        elseif ($seuil === 'risque') $mhParFiliereQ->havingRaw('avc_filiere < 0.50');
 
         $mhParFiliere = $mhParFiliereQ->orderByDesc('mh_drif')->limit(10)->get();
 
-        // ══════════════════════════════════════════
-        //  GROUPES PAR NIVEAU (filtré)
-        // ══════════════════════════════════════════
-        $groupesParNiveau = Groupe::select(
-                'groupes.annee_formation as annee',
-                DB::raw('count(*) as total')
-            )
+        $groupesParNiveau = Groupe::select('groupes.annee_formation as annee', DB::raw('count(*) as total'))
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->whereNotNull('groupes.annee_formation')
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
@@ -254,9 +260,6 @@ class UserController extends Controller
             ->orderBy('groupes.annee_formation')
             ->get();
 
-        // ══════════════════════════════════════════
-        //  ALERTES COUNT (toujours global pour navbar)
-        // ══════════════════════════════════════════
         $groupesData = DB::table('modules')
             ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
@@ -281,12 +284,8 @@ class UserController extends Controller
             if ($g->total_modules > 0 && ($g->modules_non_demarres / $g->total_modules) > 0.20) $alertesCount++;
         }
 
-        // ══════════════════════════════════════════
-        //  LISTE SECTEURS (pour les dropdowns frontend)
-        // ══════════════════════════════════════════
         $secteursList = Secteur::select('id', 'nom')->orderBy('nom')->get();
 
-        // Groupes list - seulement si secteur_id fourni
         $groupesList = [];
         if ($secteurId) {
             $groupesList = Groupe::select('groupes.id', 'groupes.nom', 'groupes.creneau', 'groupes.annee_formation')
@@ -298,7 +297,6 @@ class UserController extends Controller
                 ->get();
         }
 
-        // Modules list - seulement si secteur_id fourni
         $modulesList = [];
         $groupeId    = $request->groupe_id;
 
@@ -307,15 +305,10 @@ class UserController extends Controller
                 ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
                 ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
                 ->select(
-                    'modules.id',
-                    'modules.code',
-                    'modules.intitule',
-                    'modules.mh_drif',
-                    'modules.mh_realisee_globale',
-                    'modules.mh_restante',
-                    'modules.taux_realisation',
-                    'modules.seance_efm',
-                    'groupes.nom as groupe_nom'
+                    'modules.id', 'modules.code', 'modules.intitule',
+                    'modules.mh_drif', 'modules.mh_realisee_globale',
+                    'modules.mh_restante', 'modules.taux_realisation',
+                    'modules.seance_efm', 'groupes.nom as groupe_nom'
                 )
                 ->where('filieres.secteur_id', $secteurId)
                 ->when($creneau,  fn($q) => $q->where('groupes.creneau', $creneau))
@@ -328,30 +321,29 @@ class UserController extends Controller
         }
 
         return response()->json([
-            'total_formateurs'    => $totalFormateurs,
-            'total_groupes'       => $totalGroupes,
-            'total_modules'       => $totalModules,
-            'total_filieres'      => $totalFilieres,
-            'total_secteurs'      => $totalSecteurs,
-            'total_surveillants'  => $totalSurveillants,
-            'mh_realisee_totale'  => round($mhRealisee),
-            'mh_restante_totale'  => round($mhRestante),
-            'mh_drif_totale'      => round($mhDrif),
-            'avc_moyen_global'    => round($avcMoyen, 4),
-            'effectif_total'      => $effectifTotal,
-            'avc_par_secteur'     => $avcParSecteur,
-            'distribution_groupes'=> $distribution,
-            'mh_par_filiere'      => $mhParFiliere,
-            'groupes_par_niveau'  => $groupesParNiveau,
-            'formateurs_actifs'   => Formateur::where('statut', 'actif')->count(),
-            'formateurs_inactifs' => Formateur::where('statut', 'inactif')->count(),
-            'par_specialite'      => [],
-            'alertes_count'       => $alertesCount,
-            'secteurs_list'       => $secteursList,
-            'groupes_list'        => $groupesList,
-            'modules_list'        => $modulesList,
-            // Filtres actifs renvoyés (utile pour debug frontend)
-            'filtres_actifs'      => array_filter([
+            'total_formateurs'     => $totalFormateurs,
+            'total_groupes'        => $totalGroupes,
+            'total_modules'        => $totalModules,
+            'total_filieres'       => $totalFilieres,
+            'total_secteurs'       => $totalSecteurs,
+            'total_surveillants'   => $totalSurveillants,
+            'mh_realisee_totale'   => round($mhRealisee),
+            'mh_restante_totale'   => round($mhRestante),
+            'mh_drif_totale'       => round($mhDrif),
+            'avc_moyen_global'     => round($avcMoyen, 4),
+            'effectif_total'       => $effectifTotal,
+            'avc_par_secteur'      => $avcParSecteur,
+            'distribution_groupes' => $distribution,
+            'mh_par_filiere'       => $mhParFiliere,
+            'groupes_par_niveau'   => $groupesParNiveau,
+            'formateurs_actifs'    => Formateur::where('statut', 'actif')->count(),
+            'formateurs_inactifs'  => Formateur::where('statut', 'inactif')->count(),
+            'par_specialite'       => [],
+            'alertes_count'        => $alertesCount,
+            'secteurs_list'        => $secteursList,
+            'groupes_list'         => $groupesList,
+            'modules_list'         => $modulesList,
+            'filtres_actifs'       => array_filter([
                 'secteur_id' => $secteurId,
                 'creneau'    => $creneau,
                 'annee'      => $annee,
