@@ -139,37 +139,37 @@ class UserController extends Controller
        GET /api/users/options?editing_user_id=X
     ════════════════════════════════════════ */
 
-    public function options(Request $request)
-    {
-        $editingUserId = $request->query('editing_user_id');
+public function options(Request $request)
+{
+    $editingUserId = $request->query('editing_user_id');
 
-        $formateursAvecCompte = User::where('role', 'formateur')
-            ->whereNotNull('formateur_id')
-            ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
-            ->pluck('formateur_id');
+    $formateursAvecCompte = User::where('role', 'formateur')
+        ->whereNotNull('formateur_id')
+        ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
+        ->pluck('formateur_id');
 
-        $formateurs = Formateur::whereNotIn('id', $formateursAvecCompte)
-            ->where('statut', 'actif')
-            ->select('id', 'nom', 'mle')
-            ->orderBy('nom')
-            ->get();
+    $formateurs = Formateur::whereNotIn('id', $formateursAvecCompte)
+        ->where('statut', 'actif')
+        ->select('id', 'nom', 'mle')
+        ->orderBy('nom')
+        ->get();
 
-        $secteursAvecCompte = User::where('role', 'pole')
-            ->whereNotNull('secteur_id')
-            ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
-            ->pluck('secteur_id');
+    $secteurs = DB::table('pole_secteur')
+        ->join('formateurs', 'pole_secteur.formateur_id', '=', 'formateurs.id')
+        ->join('secteurs',   'pole_secteur.secteur_id',   '=', 'secteurs.id')
+        ->select(
+            'pole_secteur.id',
+            'secteurs.nom         as nom',
+            'formateurs.nom       as responsable_nom'
+        )
+        ->orderBy('secteurs.nom')
+        ->get();
 
-        $secteurs = Secteur::whereNotIn('id', $secteursAvecCompte)
-            ->select('id', 'nom')
-            ->orderBy('nom')
-            ->get();
-
-        return response()->json([
-            'formateurs' => $formateurs,
-            'secteurs'   => $secteurs,
-        ]);
-    }
-
+    return response()->json([
+        'formateurs' => $formateurs,
+        'secteurs'   => $secteurs,
+    ]);
+}
     /* ════════════════════════════════════════
        STATS — dashboard
     ════════════════════════════════════════ */

@@ -6,9 +6,9 @@ import { Icons } from "../../components/admin/Icons";
    CONFIG RÔLES
 ════════════════════════════════════════ */
 const ROLE_CFG = {
-  directeur: { label: "Directeur", bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0", },
-  formateur: { label: "Formateur", bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe",  },
-  pole:      { label: "Pôle",      bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff", },
+  directeur: { label: "Directeur", bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+  formateur: { label: "Formateur", bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  pole:      { label: "Pôle",      bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
 };
 
 const AV_COLORS = {
@@ -90,6 +90,17 @@ export default function Utilisateurs() {
   const fetchOptions = (userId = null) => {
     const params = userId ? { editing_user_id: userId } : {};
     axios.get("/users/options", { params }).then(r => setOptions(r.data)).catch(() => {});
+  };
+
+  /* ── NOUVEAU : auto-fill nom quand on sélectionne un formateur ── */
+  const handleFormateurChange = (e) => {
+    const id = e.target.value;
+    const f  = options.formateurs.find(f => String(f.id) === String(id));
+    setForm(p => ({
+      ...p,
+      formateur_id: id,
+      name: f ? f.nom : "",   // auto-fill nom, vide si désélectionné
+    }));
   };
 
   /* ── Modal ── */
@@ -192,7 +203,6 @@ export default function Utilisateurs() {
               transition: "all .15s", userSelect: "none",
             }}
           >
-            
             <div>
               <div style={{
                 fontSize: 26, fontWeight: 800, color: cfg.color, lineHeight: 1,
@@ -268,7 +278,6 @@ export default function Utilisateurs() {
           </div>
         ) : data.length === 0 ? (
           <div className="empty">
-  
             <div className="empty-title">Aucun utilisateur trouvé</div>
             <div className="empty-desc">
               Créez des comptes pour vos formateurs et responsables de pôle
@@ -327,7 +336,6 @@ export default function Utilisateurs() {
                       <td style={{ fontSize: 12.5, color: "var(--sl6)" }}>
                         {u.role === "formateur" && u.formateur ? (
                           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-  
                             {u.formateur.nom}
                             <span style={{ color: "var(--sl4)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
                               · {u.formateur.mle}
@@ -417,7 +425,7 @@ export default function Utilisateurs() {
                   <button
                     key={role}
                     type="button"
-                    onClick={() => setForm(p => ({ ...p, role, formateur_id: "", secteur_id: "" }))}
+                    onClick={() => setForm(p => ({ ...p, role, formateur_id: "", secteur_id: "", name: "", email: "" }))}
                     style={{
                       flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                       border: `2px solid ${form.role === role ? cfg.color : "var(--border)"}`,
@@ -428,25 +436,68 @@ export default function Utilisateurs() {
                       boxShadow: form.role === role ? `0 2px 10px ${cfg.color}22` : "none",
                     }}
                   >
-                    <span style={{ fontSize: 18 }}>{cfg.emoji}</span>
                     {cfg.label}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* ── Formateur link — AFFICHÉ EN PREMIER pour rôle formateur ── */}
+            {form.role === "formateur" && (
+              <div className="form-group">
+                <label className="form-label">Formateur lié *</label>
+                {options.formateurs.length === 0 ? (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 8,
+                    background: "#fffbeb", border: "1px solid #fde68a",
+                    fontSize: 12, color: "#92400e",
+                    display: "flex", alignItems: "center", gap: 8,
+                  }}>
+                    Tous les formateurs actifs ont déjà un compte utilisateur.
+                  </div>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={form.formateur_id}
+                    onChange={handleFormateurChange}
+                  >
+                    <option value="">— Sélectionner un formateur —</option>
+                    {options.formateurs.map(f => (
+                      <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
+                    ))}
+                  </select>
+                )}
+                {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
+              </div>
+            )}
+
             {/* ── Nom + Email ── */}
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Nom complet *</label>
-                <input className="form-input" placeholder="Ex: AMINE MAJID"
-                  value={form.name} onChange={set("name")} />
+                <input
+                  className="form-input"
+                  placeholder="Ex: AMINE MAJID"
+                  value={form.name}
+                  onChange={set("name")}
+                  readOnly={form.role === "formateur" && !!form.formateur_id}
+                  style={
+                    form.role === "formateur" && !!form.formateur_id
+                      ? { background: "var(--n1)", color: "var(--sl5)", cursor: "not-allowed" }
+                      : {}
+                  }
+                />
                 {errors.name && <div className="field-err">{errors.name[0]}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">Email *</label>
-                <input className="form-input" type="email" placeholder="email@ista.ma"
-                  value={form.email} onChange={set("email")} />
+                <input
+                  className="form-input"
+                  type="email"
+                  placeholder="email@ista.ma"
+                  value={form.email}
+                  onChange={set("email")}
+                />
                 {errors.email && <div className="field-err">{errors.email[0]}</div>}
               </div>
             </div>
@@ -470,32 +521,6 @@ export default function Utilisateurs() {
                   value={form.password_confirmation} onChange={set("password_confirmation")} />
               </div>
             </div>
-
-            {/* ── Formateur link ── */}
-            {form.role === "formateur" && (
-              <div className="form-group">
-                <label className="form-label">Formateur lié *</label>
-                {options.formateurs.length === 0 ? (
-                  <div style={{
-                    padding: "10px 14px", borderRadius: 8,
-                    background: "#fffbeb", border: "1px solid #fde68a",
-                    fontSize: 12, color: "#92400e",
-                    display: "flex", alignItems: "center", gap: 8,
-                  }}>
-                    
-                    Tous les formateurs actifs ont déjà un compte utilisateur.
-                  </div>
-                ) : (
-                  <select className="form-select" value={form.formateur_id} onChange={set("formateur_id")}>
-                    <option value="">— Sélectionner un formateur —</option>
-                    {options.formateurs.map(f => (
-                      <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
-                    ))}
-                  </select>
-                )}
-                {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
-              </div>
-            )}
 
             {/* ── Secteur link ── */}
             {form.role === "pole" && (

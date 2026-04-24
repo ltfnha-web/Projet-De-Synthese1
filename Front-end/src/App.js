@@ -17,20 +17,21 @@ import DirecteurPole         from "./pages/directeur/Pole";
 import DirecteurAlertes      from "./pages/directeur/Alertes";
 import DirecteurUtilisateurs from "./pages/directeur/Utilisateurs";
 
-// NOUVEAUX IMPORTS pour le rôle Pôle
+// Rôle Pôle
 import PoleLayout            from "./pages/pole/PoleLayout";
 import Plannings             from "./pages/pole/Plannings";
 import Emplois               from "./pages/pole/Emplois";
+import PlanningStage         from "./pages/pole/PlanningStage";
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/home" replace />;
   const redirects = {
-    directeur:   "/directeur/dashboard",
-    formateur:   "/formateur/dashboard",
-    stagiaire:   "/stagiaire/espace",
-    pole:        "/pole/plannings",   // ← AJOUT
+    directeur: "/directeur/dashboard",
+    formateur: "/formateur/dashboard",
+    stagiaire: "/stagiaire/espace",
+    pole:      "/pole/plannings",
   };
   return <Navigate to={redirects[user.role] || "/home"} replace />;
 }
@@ -61,11 +62,8 @@ export default function App() {
             <Route path="import"       element={<DirecteurImport />} />
             <Route path="alertes"      element={<DirecteurAlertes />} />
             <Route path="pole"         element={<DirecteurPole />} />
-            <Route path="pole"          element={<DirecteurPole />} />  
-            <Route path="utilisateurs"  element={<DirecteurUtilisateurs />} />  {/* ← AJOUT */}
+            <Route path="utilisateurs" element={<DirecteurUtilisateurs />} />
           </Route>
-
-         
 
           {/* FORMATEUR */}
           <Route path="/formateur/dashboard" element={
@@ -74,14 +72,15 @@ export default function App() {
             </ProtectedRoute>
           } />
 
-          {/* NOUVEAU : PÔLE */}
+          {/* PÔLE */}
           <Route path="/pole" element={
             <ProtectedRoute roles={["pole"]}>
               <PoleLayout />
             </ProtectedRoute>
           }>
-            <Route path="plannings" element={<Plannings />} />
-            <Route path="emplois"   element={<Emplois />} />
+            <Route path="plannings"      element={<Plannings />} />
+            <Route path="emplois"        element={<Emplois />} />
+            <Route path="planning-stage" element={<PlanningStage />} />
           </Route>
 
           {/* Fallback */}

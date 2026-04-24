@@ -33,10 +33,6 @@ const Ico = {
   table: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/><line x1="15" y1="9" x2="15" y2="21"/></svg>,
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   DOCUMENT OFPPT — noir / blanc / cyan  — identique à l'image
-═══════════════════════════════════════════════════════════════ */
-/* Calcule les heures hebdo depuis la grille (chaque séance = 2.5h) */
 function calcNbHeures(jours) {
   if (!jours) return 0;
   let count = 0;
@@ -46,71 +42,48 @@ function calcNbHeures(jours) {
   return count * 2.5;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   DOCUMENT OFPPT — tailles compactes pour tenir sur 1 feuille
+═══════════════════════════════════════════════════════════════ */
 function DocumentOFPPT({ emploi }) {
   if (!emploi) return null;
 
-  // Heures hebdo calculées automatiquement depuis les séances de la grille
   const heuresHebdo = emploi.nb_heures ?? calcNbHeures(emploi.jours);
-  // Heures annuelles = heures hebdo × 23 semaines
   const heuresAnnee = heuresHebdo * 23;
 
-  /* Styles de base pour toutes les <td> du document */
   const TD = {
     border: "1px solid #000",
-    padding: "4px 7px",
+    padding: "2px 5px",
     verticalAlign: "top",
     color: "#000",
     background: "#fff",
-    fontSize: 11,
+    fontSize: 9,
     fontFamily: "Arial, Helvetica, sans-serif",
   };
 
-  const TBL = {
-    width: "100%",
-    borderCollapse: "collapse",
-    tableLayout: "fixed",
-  };
+  const TBL = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
 
   return (
-    <div style={{
-      fontFamily: "Arial, Helvetica, sans-serif",
-      fontSize: 11,
-      color: "#000",
-      background: "#fff",
-      padding: "10px 12px",
-      boxSizing: "border-box",
-      width: "100%",
-    }}>
+    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: 9, color: "#000", background: "#fff", padding: "6px 8px", boxSizing: "border-box", width: "100%" }}>
 
       {/* ══ 1. EN-TÊTE ══════════════════════════════════════════════════════ */}
       <table style={TBL}>
-        <colgroup>
-          <col style={{ width: "14%" }} />
-          <col style={{ width: "56%" }} />
-          <col style={{ width: "30%" }} />
-        </colgroup>
+        <colgroup><col style={{ width: "14%" }} /><col style={{ width: "56%" }} /><col style={{ width: "30%" }} /></colgroup>
         <tbody>
           <tr>
-            {/* OFPPT */}
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "6px 8px" }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>OFPPT</div>
-              <div style={{ fontSize: 8.5, direction: "rtl", lineHeight: 1.6 }}>مكتب التكوين المهني وإنعاش الشغل</div>
-              <div style={{ fontSize: 8, color: "#555", direction: "rtl" }}>المملكة المغربية</div>
-              <div style={{ marginTop: 4, fontWeight: 700, fontSize: 10 }}>CF SALE I</div>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "4px 6px" }}>
+              <div style={{ fontWeight: 700, fontSize: 12 }}>OFPPT</div>
+              <div style={{ fontSize: 7.5, direction: "rtl", lineHeight: 1.5 }}>مكتب التكوين المهني وإنعاش الشغل</div>
+              <div style={{ fontSize: 7, color: "#555", direction: "rtl" }}>المملكة المغربية</div>
+              <div style={{ marginTop: 2, fontWeight: 700, fontSize: 9 }}>CF SALE I</div>
             </td>
-
-            {/* Titre */}
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "10px 12px" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: 2, color: "#000" }}>EMPLOI DU TEMPS</div>
-              <div style={{ fontSize: 11, direction: "rtl", fontFamily: "serif", color: "#333", margin: "4px 0" }}>
-                جدول التوقيت الأسبوعي
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#000" }}>Année de Formation 2025-2026</div>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "5px 10px" }}>
+              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2, color: "#000" }}>EMPLOI DU TEMPS</div>
+              <div style={{ fontSize: 9, direction: "rtl", fontFamily: "serif", color: "#333", margin: "2px 0" }}>جدول التوقيت الأسبوعي</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#000" }}>Année de Formation 2025-2026</div>
             </td>
-
-            {/* Arabe droite */}
-            <td style={{ ...TD, textAlign: "right", verticalAlign: "middle", padding: "6px 10px" }}>
-              <div style={{ direction: "rtl", fontSize: 10, lineHeight: 2, color: "#000" }}>
+            <td style={{ ...TD, textAlign: "right", verticalAlign: "middle", padding: "4px 8px" }}>
+              <div style={{ direction: "rtl", fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
                 <div style={{ fontWeight: 700 }}>مكتب التكوين المهني والتقني</div>
                 <div>Office de la Formation Professionnelle</div>
                 <div>et de la Promotion du Travail</div>
@@ -120,11 +93,11 @@ function DocumentOFPPT({ emploi }) {
         </tbody>
       </table>
 
-      {/* ══ 2. EFP + VERSION ════════════════════════════════════════════════ */}
+      {/* ══ 2. EFP ══════════════════════════════════════════════════════════ */}
       <table style={TBL}>
         <tbody>
           <tr>
-            <td style={{ ...TD, padding: "3px 8px" }}>
+            <td style={{ ...TD, padding: "2px 6px" }}>
               <span style={{ fontWeight: 700 }}>EFP : </span>ISTA HAY SALAM SALE
               <span style={{ float: "right", fontWeight: 700, textDecoration: "underline" }}>Version 1</span>
             </td>
@@ -136,15 +109,7 @@ function DocumentOFPPT({ emploi }) {
       <table style={TBL}>
         <tbody>
           <tr>
-            <td style={{
-              border: "1px solid #000",
-              padding: "5px 10px",
-              background: "#00bcd4",
-              textAlign: "center",
-              fontWeight: 900,
-              fontSize: 13,
-              color: "#000",
-            }}>
+            <td style={{ border: "1px solid #000", padding: "3px 8px", background: "#00bcd4", textAlign: "center", fontWeight: 900, fontSize: 11, color: "#000" }}>
               Période d'application : A partir du {toStr(emploi.periodeDebut ?? emploi.periode_debut ?? "—")}
             </td>
           </tr>
@@ -153,15 +118,11 @@ function DocumentOFPPT({ emploi }) {
 
       {/* ══ 4. FILIÈRE / NIVEAUX ════════════════════════════════════════════ */}
       <table style={TBL}>
-        <colgroup>
-          <col style={{ width: "50%" }} />
-          <col style={{ width: "50%" }} />
-        </colgroup>
+        <colgroup><col style={{ width: "50%" }} /><col style={{ width: "50%" }} /></colgroup>
         <tbody>
           <tr>
-            {/* Infos groupe */}
-            <td style={{ ...TD, padding: "5px 8px" }}>
-              <table style={{ borderCollapse: "collapse", fontSize: 11 }}>
+            <td style={{ ...TD, padding: "3px 6px" }}>
+              <table style={{ borderCollapse: "collapse", fontSize: 9 }}>
                 <tbody>
                   {[
                     ["Filière :", toStr(emploi.filiere ?? "—")],
@@ -170,40 +131,34 @@ function DocumentOFPPT({ emploi }) {
                     ["Formateur Parrain du Groupe :", toStr(emploi.formateur_parrain ?? "")],
                   ].map(([k, v], i) => (
                     <tr key={i}>
-                      <td style={{ paddingRight: 6, fontWeight: 700, whiteSpace: "nowrap", verticalAlign: "top", lineHeight: 2, color: "#000" }}>{k}</td>
-                      <td style={{ lineHeight: 2, color: "#000" }}>{v}</td>
+                      <td style={{ paddingRight: 5, fontWeight: 700, whiteSpace: "nowrap", verticalAlign: "top", lineHeight: 1.65, color: "#000" }}>{k}</td>
+                      <td style={{ lineHeight: 1.65, color: "#000" }}>{v}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </td>
-
-            {/* Niveaux + nb heures */}
-            <td style={{ ...TD, padding: "5px 10px" }}>
-              <div style={{ display: "flex", gap: 24, marginBottom: 5 }}>
+            <td style={{ ...TD, padding: "3px 8px" }}>
+              <div style={{ display: "flex", gap: 18, marginBottom: 3 }}>
                 <div>
                   {NIVEAUX_COL1.map(n => (
-                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 5, lineHeight: 1.95, fontSize: 10.5, color: "#000" }}>
-                      <div style={{ width: 11, height: 11, border: "1px solid #000", flexShrink: 0, background: "#fff" }} />
-                      {n}
+                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 4, lineHeight: 1.65, fontSize: 9, color: "#000" }}>
+                      <div style={{ width: 9, height: 9, border: "1px solid #000", flexShrink: 0, background: "#fff" }} />{n}
                     </div>
                   ))}
                 </div>
                 <div>
                   {NIVEAUX_COL2.map(n => (
-                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 5, lineHeight: 1.95, fontSize: 10.5, color: "#000" }}>
-                      <div style={{ width: 11, height: 11, border: "1px solid #000", flexShrink: 0, background: "#fff" }} />
-                      {n}
+                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 4, lineHeight: 1.65, fontSize: 9, color: "#000" }}>
+                      <div style={{ width: 9, height: 9, border: "1px solid #000", flexShrink: 0, background: "#fff" }} />{n}
                     </div>
                   ))}
                 </div>
               </div>
-              <div style={{ textAlign: "right", fontSize: 11, color: "#000" }}>
+              <div style={{ textAlign: "right", fontSize: 9, color: "#000" }}>
                 <span style={{ fontWeight: 700 }}>Nombre d'heures : </span>
-                <strong style={{ fontSize: 13 }}>{heuresHebdo} heures / sem</strong>
-                <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>
-                  Soit <strong>{heuresAnnee}h</strong> / an (23 sem)
-                </div>
+                <strong style={{ fontSize: 11 }}>{heuresHebdo} heures / sem</strong>
+                <div style={{ fontSize: 8.5, color: "#555", marginTop: 1 }}>Soit <strong>{heuresAnnee}h</strong> / an (23 sem)</div>
               </div>
             </td>
           </tr>
@@ -213,62 +168,43 @@ function DocumentOFPPT({ emploi }) {
       {/* ══ 5. GRILLE HORAIRE ═══════════════════════════════════════════════ */}
       <table style={TBL}>
         <colgroup>
-          <col style={{ width: "8%" }} />
-          <col style={{ width: "23%" }} />
-          <col style={{ width: "23%" }} />
-          <col style={{ width: "23%" }} />
-          <col style={{ width: "23%" }} />
+          <col style={{ width: "7%" }} />
+          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
+          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
         </colgroup>
         <thead>
           <tr>
-            <th style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, verticalAlign: "middle" }}>
-              <div style={{ color: "#000" }}>Séances</div>
-              <div style={{ color: "#000" }}>Jours</div>
+            <th style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, verticalAlign: "middle", padding: "2px 3px" }}>
+              <div style={{ color: "#000", fontSize: 8.5 }}>Séances</div>
+              <div style={{ color: "#000", fontSize: 8.5 }}>Jours</div>
             </th>
             {SEANCES.map((s, i) => (
-              <th key={i} style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700 }}>
-                <div style={{ color: "#000", fontSize: 11 }}>{s.label}</div>
-                <div style={{ color: "#000", fontWeight: 400, fontSize: 10 }}>{s.horaire}</div>
+              <th key={i} style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, padding: "2px 4px" }}>
+                <div style={{ color: "#000", fontSize: 9 }}>{s.label}</div>
+                <div style={{ color: "#000", fontWeight: 400, fontSize: 8.5 }}>{s.horaire}</div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {JOURS.map((jour) => {
-            const seances = Array.isArray(emploi.jours?.[jour])
-              ? emploi.jours[jour]
-              : [null, null, null, null];
+            const seances = Array.isArray(emploi.jours?.[jour]) ? emploi.jours[jour] : [null, null, null, null];
             return (
               <tr key={jour}>
-                {/* Nom du jour */}
-                <td style={{ ...TD, fontWeight: 700, fontSize: 11, textAlign: "center", verticalAlign: "middle", background: "#fafafa", color: "#000" }}>
+                <td style={{ ...TD, fontWeight: 700, fontSize: 9, textAlign: "center", verticalAlign: "middle", background: "#fafafa", color: "#000", padding: "2px 3px" }}>
                   {jour}
                 </td>
                 {seances.map((s, i) => {
                   if (!s || !s.module) {
-                    return (
-                      <td key={i} style={{ ...TD, background: "#fff" }}>
-                        <div style={{ minHeight: 44 }} />
-                      </td>
-                    );
+                    return <td key={i} style={{ ...TD, background: "#fff", padding: "2px 4px" }}><div style={{ minHeight: 32 }} /></td>;
                   }
                   return (
-                    <td key={i} style={{ ...TD, background: "#fff", verticalAlign: "top" }}>
-                      {/* Horaire */}
-                      <div style={{ fontSize: 9.5, color: "#444", marginBottom: 1 }}>{SEANCES[i].horaire}</div>
-                      {/* Module */}
-                      <div style={{ fontWeight: 700, fontSize: 11, color: "#000", lineHeight: 1.3, marginBottom: 1 }}>
-                        {toStr(s.module)}
-                      </div>
-                      {/* Formateur */}
-                      <div style={{ fontSize: 10.5, color: "#000", marginBottom: 1 }}>
-                        {toStr(s.formateur)}
-                      </div>
-                      {/* Mode / Salle */}
-                      <div style={{ fontSize: 10, color: "#000" }}>
-                        {s.mode === "DISTANCIEL"
-                          ? "Formation à distance"
-                          : `Formation en présentiel${s.salle ? ` / ${s.salle}` : ""}`}
+                    <td key={i} style={{ ...TD, background: "#fff", verticalAlign: "top", padding: "2px 4px" }}>
+                      <div style={{ fontSize: 8, color: "#444", marginBottom: 1 }}>{SEANCES[i].horaire}</div>
+                      <div style={{ fontWeight: 700, fontSize: 9, color: "#000", lineHeight: 1.25, marginBottom: 1 }}>{toStr(s.module)}</div>
+                      <div style={{ fontSize: 8.5, color: "#000", marginBottom: 1 }}>{toStr(s.formateur)}</div>
+                      <div style={{ fontSize: 8, color: "#000" }}>
+                        {s.mode === "DISTANCIEL" ? "Formation à distance" : `Présentiel${s.salle ? ` / ${s.salle}` : ""}`}
                       </div>
                     </td>
                   );
@@ -281,38 +217,29 @@ function DocumentOFPPT({ emploi }) {
 
       {/* ══ 6. PIED DE PAGE ═════════════════════════════════════════════════ */}
       <table style={TBL}>
-        <colgroup>
-          <col style={{ width: "35%" }} />
-          <col style={{ width: "35%" }} />
-          <col style={{ width: "30%" }} />
-        </colgroup>
+        <colgroup><col style={{ width: "35%" }} /><col style={{ width: "35%" }} /><col style={{ width: "30%" }} /></colgroup>
         <tbody>
           <tr>
-            {/* Emargements */}
-            <td style={{ ...TD, verticalAlign: "top" }}>
-              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 3, fontSize: 11, color: "#000" }}>Emargements :</div>
-              <div style={{ fontSize: 10.5, lineHeight: 1.9, color: "#000" }}>
+            <td style={{ ...TD, verticalAlign: "top", padding: "3px 6px" }}>
+              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 2, fontSize: 9, color: "#000" }}>Emargements :</div>
+              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
                 <div>Fait à Salé</div>
                 <div>Date : {toStr(emploi.periodeDebut ?? emploi.periode_debut ?? "—")}</div>
               </div>
-              <div style={{ height: 28 }} />
+              <div style={{ height: 22 }} />
             </td>
-
-            {/* Le Directeur */}
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "top" }}>
-              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 4, fontSize: 11, color: "#000" }}>Le Directeur</div>
-              <div style={{ height: 28 }} />
-              <div style={{ fontSize: 10.5, color: "#0055aa", fontWeight: 700, lineHeight: 1.8 }}>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "top", padding: "3px 6px" }}>
+              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 3, fontSize: 9, color: "#000" }}>Le Directeur</div>
+              <div style={{ height: 22 }} />
+              <div style={{ fontSize: 8.5, color: "#0055aa", fontWeight: 700, lineHeight: 1.7 }}>
                 <div>KADDOURI HICHAM</div>
                 <div>DIRECTEUR D'ETABLISSEMENT</div>
                 <div>ISTA HAY SALAM SALE</div>
               </div>
             </td>
-
-            {/* DRRSK */}
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle" }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 5, color: "#000" }}>DRRSK</div>
-              <div style={{ fontSize: 10.5, lineHeight: 1.8, color: "#000" }}>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "3px 6px" }}>
+              <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 3, color: "#000" }}>DRRSK</div>
+              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
                 <div>ISTA Hay Salam - CF SALE 1</div>
                 <div>Abd ABDELKRIM KHATABI</div>
                 <div>Hay Salam - Salé</div>
@@ -531,7 +458,6 @@ function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "flex-start", paddingTop: 24, paddingBottom: 24, overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 14, width: "100%", maxWidth: 1380, alignItems: "flex-start", margin: "0 auto", padding: "0 12px" }}>
 
-        {/* Éditeur grille */}
         <div style={{ flex: "1 1 860px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", overflow: "hidden", border: "1px solid var(--sp-border)" }}>
           <div style={{ background: "var(--sp-black)", padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
@@ -711,25 +637,57 @@ export default function Emplois() {
     } catch { flash("Erreur de suppression.", "err"); }
   };
 
+  /* ─────────────────────────────────────────────────────────────
+     handlePrint : fenêtre isolée + zoom 0.82 → 1 feuille A4 land.
+     Double approche : zoom CSS (Chrome/Edge) + transform (Firefox)
+  ───────────────────────────────────────────────────────────── */
+  const handlePrint = () => {
+    const docEl = document.getElementById("emploi-doc-content");
+    if (!docEl) return;
+
+    const win = window.open("", "_blank", "width=1200,height=850");
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Emploi du temps — ${toStr(emploiActif?.groupe ?? "")}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
+
+    @page {
+      size: A4 landscape;
+      margin: 5mm;
+    }
+
+    @media print {
+      /* Chrome / Edge */
+      html { zoom: 0.82; }
+
+      /* Firefox fallback (@supports not zoom) */
+      @supports not (zoom: 1) {
+        body {
+          transform: scale(0.82);
+          transform-origin: top left;
+          width: 122%;
+        }
+      }
+    }
+  </style>
+</head>
+<body>
+  ${docEl.innerHTML}
+</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 500);
+  };
+
   return (
     <div className="sp-container" style={{ paddingTop: 24, paddingBottom: 40 }}>
 
-      {/* CSS impression */}
-      <style>{`
-        @media print {
-          @page { size: A4 landscape; margin: 5mm; }
-          body > * { visibility: hidden !important; }
-          #emploi-doc, #emploi-doc * { visibility: visible !important; }
-          #emploi-doc {
-            position: fixed !important; top: 0 !important; left: 0 !important;
-            width: 100% !important; box-shadow: none !important;
-            border: none !important; border-radius: 0 !important;
-          }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-
-      {/* Header page */}
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "var(--sp-black)", letterSpacing: -0.5 }}>Emplois du temps</div>
@@ -753,26 +711,19 @@ export default function Emplois() {
       {showModal && <ModalCreerEmploi onClose={() => setModal(false)} onSaved={() => { setModal(false); fetchAll(); flash("Emploi du temps créé."); }} groupes={groupes} plannings={plannings} />}
       {showFmtModal && <ModalFormateurTimetable onClose={() => setFmtModal(false)} formateurs={formateurs} />}
 
-      {loading && (
-        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--sp-gray-400)" }}>Chargement…</div>
-      )}
+      {loading && <div style={{ textAlign: "center", padding: "60px 0", color: "var(--sp-gray-400)" }}>Chargement…</div>}
 
-      {/* ── Cartes emplois ── */}
+      {/* Cartes emplois */}
       {!loading && emplois.length > 0 && (
         <div className="sp-cards-grid" style={{ padding: 0, marginBottom: 24 }}>
           {emplois.map(e => (
-            <div key={e.id}
-              onClick={() => afficherEmploi(e.id)}
-              className="sp-card"
+            <div key={e.id} onClick={() => afficherEmploi(e.id)} className="sp-card"
               style={{ cursor: "pointer", borderColor: emploiActif?.id === e.id ? "var(--sp-green)" : "var(--sp-border)", background: emploiActif?.id === e.id ? "var(--sp-green-light)" : "#fff" }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: "var(--sp-black)" }}>{toStr(e.groupe)}</div>
-                <button
-                  style={{ background: "#fee2e2", border: "none", borderRadius: 5, color: "#dc2626", cursor: "pointer", width: 24, height: 24, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-                  title="Supprimer"
-                  onClick={ev => { ev.stopPropagation(); supprimerEmploi(e.id); }}
-                >
+                <button style={{ background: "#fee2e2", border: "none", borderRadius: 5, color: "#dc2626", cursor: "pointer", width: 24, height: 24, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  title="Supprimer" onClick={ev => { ev.stopPropagation(); supprimerEmploi(e.id); }}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                 </button>
               </div>
@@ -799,30 +750,16 @@ export default function Emplois() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
-          DOCUMENT OFPPT — affiché dans la page, imprimé identique
-          ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ DOCUMENT OFPPT ═════════════════════════════════════════════════ */}
       {emploiActif && (
-        <div id="emploi-doc" style={{
-          background: "#fff",
-          border: "1px solid #ccc",
-          borderRadius: 6,
-          overflow: "hidden",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-        }}>
-          {/* Barre d'actions (cachée à l'impression) */}
-          <div className="no-print" style={{
-            background: "var(--sp-black)",
-            padding: "9px 14px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}>
+        <div id="emploi-doc" style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>
+          {/* Barre d'actions */}
+          <div style={{ background: "var(--sp-black)", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>
               {toStr(emploiActif.groupe)} · {toStr(emploiActif.semestre)}
             </span>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="sp-btn sp-btn--secondary" style={{ height: 28, fontSize: 11, background: "rgba(255,255,255,.1)", color: "#fff", borderColor: "rgba(255,255,255,.2)" }} onClick={() => window.print()}>
+              <button className="sp-btn sp-btn--secondary" style={{ height: 28, fontSize: 11, background: "rgba(255,255,255,.1)", color: "#fff", borderColor: "rgba(255,255,255,.2)" }} onClick={handlePrint}>
                 {Ico.print} Imprimer
               </button>
               <button className="sp-btn sp-btn--secondary" style={{ height: 28, fontSize: 11, background: "rgba(255,255,255,.1)", color: "#fff", borderColor: "rgba(255,255,255,.2)" }} onClick={() => setEmploiActif(null)}>
@@ -831,8 +768,10 @@ export default function Emplois() {
             </div>
           </div>
 
-          {/* Le document OFPPT — noir / blanc / cyan */}
-          <DocumentOFPPT emploi={emploiActif} />
+          {/* Contenu copié dans la fenêtre d'impression */}
+          <div id="emploi-doc-content">
+            <DocumentOFPPT emploi={emploiActif} />
+          </div>
         </div>
       )}
     </div>

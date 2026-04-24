@@ -12,6 +12,7 @@ use App\Http\Controllers\AlerteController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\EmploiController;
 use App\Http\Controllers\SalleController;
+use App\Http\Controllers\StageController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
@@ -64,6 +65,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── PÔLE ──
     Route::middleware('role:pole')->group(function () {
+
+         // Stages
+          Route::get('/stages/semaines-bloquees', [StageController::class, 'semainesBloquees']);
+          Route::apiResource('stages', StageController::class);
 
         Route::put('/plannings/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
         Route::post('/plannings/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
@@ -127,8 +132,13 @@ Route::middleware('auth:sanctum')->group(function () {
                 'data' => $query->orderBy('semestre')->orderBy('intitule')->get(),
             ]);
         });
+
+       
     });
 
     Route::put('/plannings/{planning}', [PlanningController::class, 'update']);
     Route::get('/emploi-temps/view', fn() => response()->json(['page' => 'Voir EDT']));
+
+
+    
 });
