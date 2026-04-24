@@ -11,6 +11,7 @@ use App\Http\Controllers\PoleController;
 use App\Http\Controllers\AlerteController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\EmploiController;
+use App\Http\Controllers\FormateurEmploiController;
 use App\Http\Controllers\SalleController;
 use App\Http\Controllers\StageController;
 use Illuminate\Support\Facades\Route;
@@ -72,6 +73,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::put('/plannings/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
         Route::post('/plannings/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
+
+        // Emplois du temps (formateurs)
+        Route::post('/formateur-emplois',       [FormateurEmploiController::class, 'store']);
+        Route::get('/formateur-emplois',        [FormateurEmploiController::class, 'index']);
+        Route::get('/formateur-emplois/{id}',   [FormateurEmploiController::class, 'show']);
+        Route::delete('/formateur-emplois/{id}',[FormateurEmploiController::class, 'destroy']);
 
         // Emplois du temps
         Route::prefix('emplois')->group(function () {

@@ -136,6 +136,7 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
       semestre:     p.semestre ?? "S1",
       mh_drif:      p.mh_drif ?? "",
       charge_hebdo: p.charge_hebdo ?? "",
+      type:         p.type ?? "Régionale",
     });
     setEditing(true);
   };
@@ -148,6 +149,7 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
         semestre:     editData.semestre,
         mh_drif:      parseInt(editData.mh_drif),
         charge_hebdo: editData.charge_hebdo !== "" ? parseFloat(editData.charge_hebdo) : p.charge_hebdo,
+        type:         editData.type,
       });
       onUpdate(p.id, res.data.planning ?? {
         formateur_id:  parseInt(editData.formateur_id),
@@ -221,16 +223,34 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
         <AvcBar mhDrif={p.mh_drif} totalPrevu={p.total_prevu} />
       </td>
       <td style={{ textAlign: "center", padding: "4px 6px" }}>
-        <span style={{
-          display: "inline-block",
-          fontSize: 10, fontWeight: 700,
-          padding: "2px 7px", borderRadius: 20,
-          background: p.type === "Locale" ? "#fef3c7" : "#eff6ff",
-          color: p.type === "Locale" ? "#92400e" : "#1d4ed8",
-          border: `1px solid ${p.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
-        }}>
-          {p.type === "Locale" ? "L" : "R"}
-        </span>
+        {editing ? (
+          <button
+            type="button"
+            title={`Cliquer pour passer en ${editData.type === "Locale" ? "Régionale" : "Locale"}`}
+            onClick={() => setEditData(d => ({ ...d, type: d.type === "Locale" ? "Régionale" : "Locale" }))}
+            style={{
+              fontSize: 10, fontWeight: 700,
+              padding: "2px 7px", borderRadius: 20,
+              background: editData.type === "Locale" ? "#fef3c7" : "#eff6ff",
+              color: editData.type === "Locale" ? "#92400e" : "#1d4ed8",
+              border: `1px solid ${editData.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
+              cursor: "pointer",
+            }}
+          >
+            {editData.type === "Locale" ? "L" : "R"}
+          </button>
+        ) : (
+          <span style={{
+            display: "inline-block",
+            fontSize: 10, fontWeight: 700,
+            padding: "2px 7px", borderRadius: 20,
+            background: p.type === "Locale" ? "#fef3c7" : "#eff6ff",
+            color: p.type === "Locale" ? "#92400e" : "#1d4ed8",
+            border: `1px solid ${p.type === "Locale" ? "#fde68a" : "#bfdbfe"}`,
+          }}>
+            {p.type === "Locale" ? "L" : "R"}
+          </span>
+        )}
       </td>
       {semainesAffichees.map(s => (
         <CellSemaine key={s.num} planningId={p.id} semaineNum={s.num}

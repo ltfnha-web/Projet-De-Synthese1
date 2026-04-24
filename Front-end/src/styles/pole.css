@@ -366,7 +366,17 @@
 }
 @media (max-width: 768px) {
   .pole-navbar__links   { display: none; }
-  .planning-stats       { grid-template-columns: 1fr; }
+  .planning-stats       { grid-template-columns: 1fr 1fr; }
   .emplois-form-card__fields { grid-template-columns: 1fr; }
   .pole-main            { padding: 12px; }
+  .filters-bar          { flex-direction: column; align-items: stretch; }
+  .filters-bar__actions { margin-left: 0; }
+  .table-toolbar        { flex-direction: column; gap: 8px; }
+}
+
+@media (max-width: 480px) {
+  .planning-stats       { grid-template-columns: 1fr; }
+  .pole-main            { padding: 8px; }
+  .pole-navbar          { padding: 0 12px; }
+  .pole-navbar__badge   { display: none; }
 }

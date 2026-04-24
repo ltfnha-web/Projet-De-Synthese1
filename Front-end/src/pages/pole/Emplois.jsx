@@ -254,6 +254,188 @@ function DocumentOFPPT({ emploi }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   DOCUMENT OFPPT — version FORMATEUR
+   Même en-tête, bandeau cyan, grille et pied de page.
+   Section info simplifiée : Formateur / Année / Date.
+═══════════════════════════════════════════════════════════════ */
+function DocumentFormateurOFPPT({ nom, annee, semestre, periodeDebut, grille }) {
+  const TD = {
+    border: "1px solid #000",
+    padding: "2px 5px",
+    verticalAlign: "top",
+    color: "#000",
+    background: "#fff",
+    fontSize: 9,
+    fontFamily: "Arial, Helvetica, sans-serif",
+  };
+  const TBL = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
+
+  return (
+    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: 9, color: "#000", background: "#fff", padding: "6px 8px", boxSizing: "border-box", width: "100%" }}>
+
+      {/* ══ 1. EN-TÊTE ══════════════════════════════════════════════════════ */}
+      <table style={TBL}>
+        <colgroup><col style={{ width: "14%" }} /><col style={{ width: "56%" }} /><col style={{ width: "30%" }} /></colgroup>
+        <tbody>
+          <tr>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "4px 6px" }}>
+              <div style={{ fontWeight: 700, fontSize: 12 }}>OFPPT</div>
+              <div style={{ fontSize: 7.5, direction: "rtl", lineHeight: 1.5 }}>مكتب التكوين المهني وإنعاش الشغل</div>
+              <div style={{ fontSize: 7, color: "#555", direction: "rtl" }}>المملكة المغربية</div>
+              <div style={{ marginTop: 2, fontWeight: 700, fontSize: 9 }}>CF SALE I</div>
+            </td>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "5px 10px" }}>
+              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2, color: "#000" }}>EMPLOI DU TEMPS</div>
+              <div style={{ fontSize: 9, direction: "rtl", fontFamily: "serif", color: "#333", margin: "2px 0" }}>جدول التوقيت الأسبوعي</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#000" }}>Année de Formation {annee ?? "2025-2026"}</div>
+            </td>
+            <td style={{ ...TD, textAlign: "right", verticalAlign: "middle", padding: "4px 8px" }}>
+              <div style={{ direction: "rtl", fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
+                <div style={{ fontWeight: 700 }}>مكتب التكوين المهني والتقني</div>
+                <div>Office de la Formation Professionnelle</div>
+                <div>et de la Promotion du Travail</div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ══ 2. EFP ══════════════════════════════════════════════════════════ */}
+      <table style={TBL}>
+        <tbody>
+          <tr>
+            <td style={{ ...TD, padding: "2px 6px" }}>
+              <span style={{ fontWeight: 700 }}>EFP : </span>ISTA HAY SALAM SALE
+              <span style={{ float: "right", fontWeight: 700, textDecoration: "underline" }}>Version 1</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ══ 3. BANDEAU CYAN ═════════════════════════════════════════════════ */}
+      <table style={TBL}>
+        <tbody>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: "3px 8px", background: "#00bcd4", textAlign: "center", fontWeight: 900, fontSize: 11, color: "#000" }}>
+              Période d'application : A partir du {periodeDebut ?? "—"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ══ 4. INFOS FORMATEUR ══════════════════════════════════════════════ */}
+      <table style={TBL}>
+        <tbody>
+          <tr>
+            <td style={{ ...TD, padding: "6px 10px" }}>
+              <table style={{ borderCollapse: "collapse", fontSize: 10 }}>
+                <tbody>
+                  {[
+                    ["Formateur :",          <strong key="f" style={{ fontSize: 11 }}>{nom ?? "—"}</strong>],
+                    ["Année de Formation :", annee ?? "2025-2026"],
+                    ["Semestre :",           semestre ?? "—"],
+                  ].map(([k, v], i) => (
+                    <tr key={i}>
+                      <td style={{ paddingRight: 10, fontWeight: 700, whiteSpace: "nowrap", verticalAlign: "middle", lineHeight: 2, color: "#000" }}>{k}</td>
+                      <td style={{ lineHeight: 2, color: "#000" }}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ══ 5. GRILLE HORAIRE ═══════════════════════════════════════════════ */}
+      <table style={TBL}>
+        <colgroup>
+          <col style={{ width: "7%" }} />
+          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
+          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, verticalAlign: "middle", padding: "2px 3px" }}>
+              <div style={{ color: "#000", fontSize: 8.5 }}>Séances</div>
+              <div style={{ color: "#000", fontSize: 8.5 }}>Jours</div>
+            </th>
+            {SEANCES.map((s, i) => (
+              <th key={i} style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, padding: "2px 4px" }}>
+                <div style={{ color: "#000", fontSize: 9 }}>{s.label}</div>
+                <div style={{ color: "#000", fontWeight: 400, fontSize: 8.5 }}>{s.horaire}</div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {JOURS.map((jour) => {
+            const seances = Array.isArray(grille?.[jour]) ? grille[jour] : [null, null, null, null];
+            return (
+              <tr key={jour}>
+                <td style={{ ...TD, fontWeight: 700, fontSize: 9, textAlign: "center", verticalAlign: "middle", background: "#fafafa", color: "#000", padding: "2px 3px" }}>
+                  {jour}
+                </td>
+                {seances.map((s, i) => {
+                  if (!s || !s.module) {
+                    return <td key={i} style={{ ...TD, background: "#fff", padding: "2px 4px" }}><div style={{ minHeight: 32 }} /></td>;
+                  }
+                  return (
+                    <td key={i} style={{ ...TD, background: "#fff", verticalAlign: "top", padding: "2px 4px" }}>
+                      <div style={{ fontSize: 8, color: "#444", marginBottom: 1 }}>{SEANCES[i].horaire}</div>
+                      <div style={{ fontWeight: 700, fontSize: 9, color: "#000", lineHeight: 1.25, marginBottom: 1 }}>{toStr(s.module)}</div>
+                      <div style={{ fontSize: 8.5, color: "#555", marginBottom: 1 }}>Grp. {toStr(s.groupe)}</div>
+                      <div style={{ fontSize: 8, color: "#000" }}>
+                        {s.mode === "DISTANCIEL" ? "Formation à distance" : `Présentiel${s.salle ? ` / ${s.salle}` : ""}`}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* ══ 6. PIED DE PAGE ═════════════════════════════════════════════════ */}
+      <table style={TBL}>
+        <colgroup><col style={{ width: "35%" }} /><col style={{ width: "35%" }} /><col style={{ width: "30%" }} /></colgroup>
+        <tbody>
+          <tr>
+            <td style={{ ...TD, verticalAlign: "top", padding: "3px 6px" }}>
+              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 2, fontSize: 9, color: "#000" }}>Emargements :</div>
+              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
+                <div>Fait à Salé</div>
+                <div>Date : {periodeDebut ?? "—"}</div>
+              </div>
+              <div style={{ height: 22 }} />
+            </td>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "top", padding: "3px 6px" }}>
+              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 3, fontSize: 9, color: "#000" }}>Le Directeur</div>
+              <div style={{ height: 22 }} />
+              <div style={{ fontSize: 8.5, color: "#0055aa", fontWeight: 700, lineHeight: 1.7 }}>
+                <div>KADDOURI HICHAM</div>
+                <div>DIRECTEUR D'ETABLISSEMENT</div>
+                <div>ISTA HAY SALAM SALE</div>
+              </div>
+            </td>
+            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "3px 6px" }}>
+              <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 3, color: "#000" }}>DRRSK</div>
+              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
+                <div>ISTA Hay Salam - CF SALE 1</div>
+                <div>Abd ABDELKRIM KHATABI</div>
+                <div>Hay Salam - Salé</div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MINI PLANNING PREVIEW
 ═══════════════════════════════════════════════════════════════ */
 function MiniPlanningPreview({ plannings, groupeId, semestre }) {
@@ -303,22 +485,69 @@ function MiniPlanningPreview({ plannings, groupeId, semestre }) {
 /* ═══════════════════════════════════════════════════════════════
    MODAL EMPLOI FORMATEUR
 ═══════════════════════════════════════════════════════════════ */
-function ModalFormateurTimetable({ onClose, formateurs }) {
+function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
   const [formateurId, setFormateurId] = useState("");
-  const [data, setData]   = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [semestre, setSemestre]       = useState("S1");
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState(null);
+  const [saved, setSaved]             = useState(false);
 
   const generate = async () => {
     if (!formateurId) return;
-    setLoading(true); setError(null); setData(null);
-    try { const { data: res } = await axios.get(`/emplois/formateur/${formateurId}`); setData(res.data); }
-    catch { setError("Erreur lors de la génération."); }
-    finally { setLoading(false); }
+    setLoading(true); setError(null); setData(null); setSaved(false);
+    try {
+      const { data: res } = await axios.get(`/emplois/formateur/${formateurId}`);
+      setData(res.data ?? res);
+    } catch {
+      setError("Erreur lors de la génération.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formateurId || !grille) return;
+    setSaving(true); setError(null);
+    try {
+      await axios.post("/formateur-emplois", { formateur_id: formateurId, semestre });
+      setSaved(true);
+      onSaved?.();
+    } catch {
+      setError("Erreur lors de la sauvegarde.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePrint = () => {
+    const docEl = document.getElementById("formateur-doc-content");
+    if (!docEl) return;
+    const formateurNom = formateurs.find(f => String(f.id) === String(formateurId))?.nom ?? "";
+    const win = window.open("", "_blank", "width=1200,height=850");
+    win.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<title>Emploi du temps — ${formateurNom}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
+  @page { size: A4 landscape; margin: 5mm; }
+  @media print {
+    html { zoom: 0.82; }
+    @supports not (zoom: 1) {
+      body { transform: scale(0.82); transform-origin: top left; width: 122%; }
+    }
+  }
+</style></head>
+<body>${docEl.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 500);
   };
 
   const grille = data?.grille ?? null;
-  const hasAny = grille && JOURS.some(j => grille[j]?.some(Boolean));
+  const hasAny = grille && JOURS.some(j => (grille[j] ?? []).some(Boolean));
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "flex-start", paddingTop: 32, overflowY: "auto" }}>
@@ -328,17 +557,38 @@ function ModalFormateurTimetable({ onClose, formateurs }) {
           <button className="sp-btn sp-btn--secondary" onClick={onClose} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>{Ico.close} Fermer</button>
         </div>
         <div style={{ padding: "20px 22px" }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 18 }}>
-            <div className="sp-form-group" style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 18 }}>
+            <div className="sp-form-group" style={{ flex: 1, minWidth: 180 }}>
               <label className="sp-form-label">Formateur</label>
               <select className="sp-form-control" value={formateurId} onChange={e => setFormateurId(e.target.value)}>
                 <option value="">Sélectionner un formateur</option>
                 {formateurs.map(f => <option key={f.id} value={f.id}>{toStr(f.nom)}</option>)}
               </select>
             </div>
+            <div className="sp-form-group" style={{ width: 100 }}>
+              <label className="sp-form-label">Semestre</label>
+              <select className="sp-form-control" value={semestre} onChange={e => setSemestre(e.target.value)}>
+                <option>S1</option><option>S2</option>
+              </select>
+            </div>
             <button className="sp-btn sp-btn--primary" onClick={generate} disabled={!formateurId || loading}>
               {loading ? "Génération…" : <>{Ico.cal} Générer</>}
             </button>
+            {hasAny && !saved && (
+              <button className="sp-btn sp-btn--secondary" onClick={handleSave} disabled={saving}>
+                {saving ? "Sauvegarde…" : <>{Ico.check} Sauvegarder</>}
+              </button>
+            )}
+            {saved && (
+              <span style={{ fontSize: 12, color: "#16a34a", display: "flex", alignItems: "center", gap: 4 }}>
+                {Ico.check} Sauvegardé
+              </span>
+            )}
+            {hasAny && (
+              <button className="sp-btn sp-btn--secondary" onClick={handlePrint}>
+                {Ico.print} Imprimer
+              </button>
+            )}
           </div>
           {error && <div style={{ padding: "10px 14px", background: "#fee2e2", color: "#dc2626", borderRadius: 6, marginBottom: 14, fontSize: 12 }}>{error}</div>}
           {grille && !hasAny && <div style={{ textAlign: "center", padding: "40px 0", color: "var(--sp-gray-400)" }}>Aucune séance trouvée.</div>}
@@ -361,7 +611,7 @@ function ModalFormateurTimetable({ onClose, formateurs }) {
                     <tr key={jour} style={{ background: ji % 2 === 0 ? "#fff" : "var(--sp-gray-100)" }}>
                       <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: 12, border: "1px solid var(--sp-border)" }}>{jour}</td>
                       {[0,1,2,3].map(si => {
-                        const cell = grille[jour]?.[si];
+                        const cell = (grille[jour] ?? [])[si];
                         if (!cell) return <td key={si} style={{ padding: "10px 12px", textAlign: "center", color: "var(--sp-gray-400)", border: "1px solid var(--sp-border)" }}>—</td>;
                         return (
                           <td key={si} style={{ padding: "8px 12px", verticalAlign: "top", border: "1px solid var(--sp-border)" }}>
@@ -375,6 +625,19 @@ function ModalFormateurTimetable({ onClose, formateurs }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Hidden render used by handlePrint — same mechanism as emploi-doc-content */}
+          {grille && hasAny && (
+            <div id="formateur-doc-content" style={{ display: "none" }}>
+              <DocumentFormateurOFPPT
+                nom={formateurs.find(f => String(f.id) === String(formateurId))?.nom ?? "—"}
+                annee="2025-2026"
+                semestre={semestre}
+                periodeDebut={new Date().toLocaleDateString("fr-FR")}
+                grille={grille}
+              />
             </div>
           )}
         </div>
@@ -589,31 +852,149 @@ function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   MODAL — VOIR UN EMPLOI FORMATEUR SAUVEGARDÉ
+═══════════════════════════════════════════════════════════════ */
+function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
+  const grille = record.grille ?? null;
+  const hasAny = grille && JOURS.some(j => (grille[j] ?? []).some(Boolean));
+
+  const handlePrint = () => {
+    const docEl = document.getElementById("saved-fmt-doc-content");
+    if (!docEl) return;
+    const win = window.open("", "_blank", "width=1200,height=850");
+    win.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<title>Emploi du temps — ${record.formateur}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
+  @page { size: A4 landscape; margin: 5mm; }
+  @media print {
+    html { zoom: 0.82; }
+    @supports not (zoom: 1) { body { transform: scale(0.82); transform-origin: top left; width: 122%; } }
+  }
+</style></head>
+<body>${docEl.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 500);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "flex-start", paddingTop: 32, overflowY: "auto" }}>
+      <div style={{ width: "100%", maxWidth: 900, margin: "0 auto", padding: "0 12px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", overflow: "hidden" }}>
+
+        {/* Header */}
+        <div style={{ background: "var(--sp-black)", padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>{record.formateur} · {record.semestre}</div>
+            <div style={{ color: "rgba(255,255,255,.45)", fontSize: 11, marginTop: 2 }}>Sauvegardé le {record.created_at}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {hasAny && (
+              <button className="sp-btn sp-btn--secondary" onClick={handlePrint} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>
+                {Ico.print} Imprimer
+              </button>
+            )}
+            <button
+              className="sp-btn sp-btn--secondary"
+              onClick={() => { if (window.confirm(`Supprimer l'emploi de ${record.formateur} ?`)) onDelete(record.id); }}
+              style={{ height: 28, padding: "0 10px", fontSize: 12, color: "#dc2626", borderColor: "#dc2626" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              {" "}Supprimer
+            </button>
+            <button className="sp-btn sp-btn--secondary" onClick={onClose} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>{Ico.close} Fermer</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "20px 22px" }}>
+          {!hasAny && <div style={{ textAlign: "center", padding: "40px 0", color: "var(--sp-gray-400)" }}>Aucune séance enregistrée.</div>}
+          {hasAny && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ background: "var(--sp-black)", color: "#fff", padding: "10px 12px", border: "1px solid #333", width: 80, fontSize: 11 }}>Jour</th>
+                    {SEANCES.map((s, i) => (
+                      <th key={i} style={{ background: "var(--sp-black)", color: "#fff", padding: "8px 12px", textAlign: "center", border: "1px solid #333" }}>
+                        <div style={{ fontWeight: 600 }}>{s.label}</div>
+                        <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.6 }}>{s.horaire}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {JOURS.map((jour, ji) => (
+                    <tr key={jour} style={{ background: ji % 2 === 0 ? "#fff" : "var(--sp-gray-100)" }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: 12, border: "1px solid var(--sp-border)" }}>{jour}</td>
+                      {[0,1,2,3].map(si => {
+                        const cell = (grille[jour] ?? [])[si];
+                        if (!cell) return <td key={si} style={{ padding: "10px 12px", textAlign: "center", color: "var(--sp-gray-400)", border: "1px solid var(--sp-border)" }}>—</td>;
+                        return (
+                          <td key={si} style={{ padding: "8px 12px", verticalAlign: "top", border: "1px solid var(--sp-border)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{cell.module}</div>
+                            <div style={{ fontSize: 11, color: "var(--sp-green)", marginBottom: 2 }}>Groupe {cell.groupe}</div>
+                            <div style={{ fontSize: 10, color: "var(--sp-gray-600)" }}>{cell.salle || ""} {cell.mode === "DISTANCIEL" ? "DIST." : "PRÉS."}</div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Hidden div for print capture */}
+          {hasAny && (
+            <div id="saved-fmt-doc-content" style={{ display: "none" }}>
+              <DocumentFormateurOFPPT
+                nom={record.formateur}
+                annee="2025-2026"
+                semestre={record.semestre}
+                periodeDebut={record.created_at}
+                grille={grille}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    PAGE PRINCIPALE
 ═══════════════════════════════════════════════════════════════ */
 export default function Emplois() {
-  const [groupes, setGroupes]         = useState([]);
-  const [emplois, setEmplois]         = useState([]);
-  const [plannings, setPlannings]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [showModal, setModal]         = useState(false);
-  const [showFmtModal, setFmtModal]   = useState(false);
-  const [formateurs, setFormateurs]   = useState([]);
-  const [emploiActif, setEmploiActif] = useState(null);
-  const [alert, setAlert]             = useState(null);
+  const [groupes, setGroupes]               = useState([]);
+  const [emplois, setEmplois]               = useState([]);
+  const [plannings, setPlannings]           = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [showModal, setModal]               = useState(false);
+  const [showFmtModal, setFmtModal]         = useState(false);
+  const [formateurs, setFormateurs]         = useState([]);
+  const [emploiActif, setEmploiActif]       = useState(null);
+  const [alert, setAlert]                   = useState(null);
+  const [formateurEmplois, setFmtEmplois]   = useState([]);
+  const [viewingFmtEmploi, setViewingFmt]   = useState(null);
 
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 4000); };
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [gRes, eRes, pRes, fRes] = await Promise.allSettled([
-        axios.get("/pole-groupes"), axios.get("/emplois"), axios.get("/plannings"), axios.get("/pole-formateurs"),
+      const [gRes, eRes, pRes, fRes, feRes] = await Promise.allSettled([
+        axios.get("/pole-groupes"), axios.get("/emplois"), axios.get("/plannings"),
+        axios.get("/pole-formateurs"), axios.get("/formateur-emplois"),
       ]);
-      if (gRes.status === "fulfilled") { const d = gRes.value.data; setGroupes(Array.isArray(d) ? d : (d.data ?? [])); }
-      if (eRes.status === "fulfilled") { const d = eRes.value.data; setEmplois(Array.isArray(d) ? d : (d.data ?? [])); }
-      if (pRes.status === "fulfilled") { const d = pRes.value.data; setPlannings(d.plannings ?? (Array.isArray(d) ? d : (d.data ?? []))); }
-      if (fRes.status === "fulfilled") { const d = fRes.value.data; setFormateurs(Array.isArray(d) ? d : (d.data ?? [])); }
+      if (gRes.status  === "fulfilled") { const d = gRes.value.data;  setGroupes(Array.isArray(d) ? d : (d.data ?? [])); }
+      if (eRes.status  === "fulfilled") { const d = eRes.value.data;  setEmplois(Array.isArray(d) ? d : (d.data ?? [])); }
+      if (pRes.status  === "fulfilled") { const d = pRes.value.data;  setPlannings(d.plannings ?? (Array.isArray(d) ? d : (d.data ?? []))); }
+      if (fRes.status  === "fulfilled") { const d = fRes.value.data;  setFormateurs(Array.isArray(d) ? d : (d.data ?? [])); }
+      if (feRes.status === "fulfilled") { const d = feRes.value.data; setFmtEmplois(Array.isArray(d) ? d : (d.data ?? [])); }
     } finally { setLoading(false); }
   };
 
@@ -633,6 +1014,22 @@ export default function Emplois() {
       await axios.delete(`/emplois/${id}`);
       flash("Emploi supprimé.");
       if (emploiActif?.id === id) setEmploiActif(null);
+      fetchAll();
+    } catch { flash("Erreur de suppression.", "err"); }
+  };
+
+  const afficherFormateurEmploi = async (id) => {
+    try {
+      const { data } = await axios.get(`/formateur-emplois/${id}`);
+      setViewingFmt(data.data ?? data);
+    } catch { flash("Erreur de chargement.", "err"); }
+  };
+
+  const supprimerFormateurEmploi = async (id) => {
+    try {
+      await axios.delete(`/formateur-emplois/${id}`);
+      flash("Emploi du formateur supprimé.");
+      setViewingFmt(null);
       fetchAll();
     } catch { flash("Erreur de suppression.", "err"); }
   };
@@ -709,7 +1106,8 @@ export default function Emplois() {
       )}
 
       {showModal && <ModalCreerEmploi onClose={() => setModal(false)} onSaved={() => { setModal(false); fetchAll(); flash("Emploi du temps créé."); }} groupes={groupes} plannings={plannings} />}
-      {showFmtModal && <ModalFormateurTimetable onClose={() => setFmtModal(false)} formateurs={formateurs} />}
+      {showFmtModal && <ModalFormateurTimetable onClose={() => setFmtModal(false)} formateurs={formateurs} onSaved={() => { fetchAll(); flash("Emploi du formateur sauvegardé."); }} />}
+      {viewingFmtEmploi && <ModalViewFormateurEmploi record={viewingFmtEmploi} onClose={() => setViewingFmt(null)} onDelete={supprimerFormateurEmploi} />}
 
       {loading && <div style={{ textAlign: "center", padding: "60px 0", color: "var(--sp-gray-400)" }}>Chargement…</div>}
 
@@ -746,6 +1144,43 @@ export default function Emplois() {
             <div className="sp-empty-title">Aucun emploi du temps</div>
             <div className="sp-empty-desc">Créez le premier emploi du temps pour commencer</div>
             <button className="sp-btn sp-btn--primary" style={{ marginTop: 8 }} onClick={() => setModal(true)}>{Ico.plus} Créer un emploi du temps</button>
+          </div>
+        </div>
+      )}
+
+      {/* ══ EMPLOIS FORMATEURS SAUVEGARDÉS ════════════════════════════════ */}
+      {!loading && formateurEmplois.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1, height: 1, background: "var(--sp-border)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: "var(--sp-gray-600)", textTransform: "uppercase", letterSpacing: .5, whiteSpace: "nowrap" }}>
+              {Ico.table} Emplois formateurs sauvegardés
+            </div>
+            <div style={{ flex: 1, height: 1, background: "var(--sp-border)" }} />
+          </div>
+          <div className="sp-cards-grid" style={{ padding: 0 }}>
+            {formateurEmplois.map(fe => (
+              <div key={fe.id} onClick={() => afficherFormateurEmploi(fe.id)} className="sp-card"
+                style={{ cursor: "pointer", borderColor: viewingFmtEmploi?.id === fe.id ? "#7c3aed" : "var(--sp-border)", background: viewingFmtEmploi?.id === fe.id ? "#faf5ff" : "#fff" }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--sp-black)" }}>{fe.formateur}</div>
+                  <button
+                    style={{ background: "#fee2e2", border: "none", borderRadius: 5, color: "#dc2626", cursor: "pointer", width: 24, height: 24, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                    title="Supprimer"
+                    onClick={ev => { ev.stopPropagation(); supprimerFormateurEmploi(fe.id); }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--sp-gray-400)", display: "flex", alignItems: "center", gap: 5 }}>
+                  {Ico.cal} {fe.created_at}
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff" }}>{fe.semestre}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

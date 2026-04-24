@@ -21,12 +21,17 @@ return [
     // Origines autorisées (adresse du frontend React)
     'allowed_origins' => [
         'http://localhost:5173',   // Vite dev server (React)
-        'http://localhost:3000',   // Si vous utilisez Create React App
+        'http://localhost:3000',   // Create React App
         'http://127.0.0.1:5173',   // Alias localhost
+        'http://127.0.0.1:3000',
     ],
 
-    // Patterns d'origines (laisser vide si vous utilisez allowed_origins)
-    'allowed_origins_patterns' => [],
+    // Allows any ngrok tunnel URL (free & paid plans)
+    'allowed_origins_patterns' => [
+        '#^https://[a-z0-9\-]+\.ngrok-free\.app$#',
+        '#^https://[a-z0-9\-]+\.ngrok\.io$#',
+        '#^https://[a-z0-9\-]+\.ngrok\.app$#',
+    ],
 
     // En-têtes autorisés dans les requêtes
     'allowed_headers' => ['*'],

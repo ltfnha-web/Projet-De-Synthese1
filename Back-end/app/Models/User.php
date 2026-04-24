@@ -15,6 +15,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'plain_password',
         'role',           // directeur | surveillant | formateur | pole
         'is_active',
         'specialite',

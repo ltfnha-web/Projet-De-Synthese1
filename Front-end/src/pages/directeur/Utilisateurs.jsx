@@ -58,6 +58,7 @@ export default function Utilisateurs() {
   const [filterRole, setRole] = useState("");
   const [page, setPage]       = useState(1);
   const [alert, setAlert]     = useState(null);
+  
 
   /* Modal */
   const [modal, setModal]     = useState(false);
@@ -384,6 +385,7 @@ export default function Utilisateurs() {
               <tbody>
                 {data.map((u, i) => {
                   const av = AV_COLORS[u.role] || { bg: "var(--n1)", color: "var(--n5)" };
+                  const displayPassword = u.plain_password || "—";
                   return (
                     <tr key={u.id}>
                       <td style={{ color: "var(--sl4)", fontVariantNumeric: "tabular-nums" }}>
@@ -421,13 +423,19 @@ export default function Utilisateurs() {
                         {renderSecteur(u)}
                       </td>
 
-                      {/* Mot de passe — masqué */}
+                      {/* Mot de passe - Affiché en clair */}
                       <td>
                         <span style={{
-                          fontFamily: "var(--font-mono)", fontSize: 13,
-                          color: "var(--sl4)", letterSpacing: 2,
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 13,
+                          color: u.plain_password ? "#059669" : "#9ca3af",
+                          fontWeight: 600,
+                          backgroundColor: u.plain_password ? "#ecfdf5" : "#f3f4f6",
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          display: "inline-block",
                         }}>
-                          ••••••••
+                          {displayPassword}
                         </span>
                       </td>
 
@@ -534,7 +542,7 @@ export default function Utilisateurs() {
                     <select className="form-select" value={form.formateur_id} onChange={handleFormateurChange}>
                       <option value="">— Sélectionner un formateur —</option>
                       {options.formateurs_disponibles.map(f => (
-                        <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
+                        <option key={f.id} value={f.id}>{f.nom}</option>
                       ))}
                     </select>
                   )}
@@ -592,7 +600,7 @@ export default function Utilisateurs() {
                     <select className="form-select" value={form.formateur_id} onChange={handlePoleFormateurChange}>
                       <option value="">— Sélectionner le responsable —</option>
                       {options.formateurs_tous.map(f => (
-                        <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
+                        <option key={f.id} value={f.id}>{f.nom}</option>
                       ))}
                     </select>
                   )}

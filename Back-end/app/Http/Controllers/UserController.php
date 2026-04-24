@@ -71,14 +71,15 @@ class UserController extends Controller
         }
 
         $user = User::create([
-            'name'         => $name,
-            'email'        => $request->email,
-            'password'     => Hash::make($request->password),
-            'role'         => $request->role,
-            'is_active'    => true,
-            'statut'       => 'actif',
-            'formateur_id' => in_array($request->role, ['formateur', 'pole']) ? $request->formateur_id : null,
-            'secteur_id'   => $request->role === 'pole' ? $request->secteur_id : null,
+            'name'           => $name,
+            'email'          => $request->email,
+            'password'       => Hash::make($request->password),
+            'plain_password' => $request->password,
+            'role'           => $request->role,
+            'is_active'      => true,
+            'statut'         => 'actif',
+            'formateur_id'   => in_array($request->role, ['formateur', 'pole']) ? $request->formateur_id : null,
+            'secteur_id'     => $request->role === 'pole' ? $request->secteur_id : null,
         ]);
 
         return response()->json($user->load(['formateur', 'secteur']), 201);
@@ -123,7 +124,10 @@ class UserController extends Controller
         ]);
 
         if ($request->filled('password')) {
-            $user->update(['password' => Hash::make($request->password)]);
+            $user->update([
+                'password'       => Hash::make($request->password),
+                'plain_password' => $request->password,
+            ]);
         }
 
         return response()->json($user->load(['formateur', 'secteur']));
