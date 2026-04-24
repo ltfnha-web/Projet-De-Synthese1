@@ -36,6 +36,16 @@ function getInitials(name = "") {
   return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
+function generateEmail(nom) {
+  if (!nom) return "";
+  return nom
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .split(/\s+/)
+    .join(".") + "@gmail.com";
+}
+
 /* ════════════════════════════════════════
    COMPOSANT PRINCIPAL
 ════════════════════════════════════════ */
@@ -58,21 +68,25 @@ export default function Utilisateurs() {
     name: "", email: "",
     password: "", password_confirmation: "",
     role: "formateur",
-    formateur_id: "", secteur_id: "",
+    formateur_id: "",
+    secteur_id: "",
   });
 
-  /* Options dropdowns */
-  const [options, setOptions] = useState({ formateurs: [], secteurs: [] });
+  const [options, setOptions] = useState({
+    formateurs_disponibles: [],
+    formateurs_tous:        [],
+    secteurs:               [],
+  });
 
-  /* ── Utilitaires ── */
+  /* ── Flash ── */
   const flash = (msg, type = "ok") => {
     setAlert({ msg, type });
     setTimeout(() => setAlert(null), 3500);
   };
 
-  const set = f => e => setForm(p => ({ ...p, [f]: e.target.value }));
+  const setField = f => e => setForm(p => ({ ...p, [f]: e.target.value }));
 
-  /* ── Données ── */
+  /* ── Fetch liste principale ── */
   const fetchData = useCallback(() => {
     setLoading(true);
     axios.get("/users", { params: { search, role: filterRole, page } })
@@ -87,47 +101,96 @@ export default function Utilisateurs() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  /* ── Fetch options dropdowns ── */
   const fetchOptions = (userId = null) => {
     const params = userId ? { editing_user_id: userId } : {};
-    axios.get("/users/options", { params }).then(r => setOptions(r.data)).catch(() => {});
+    return axios.get("/users/options", { params })
+      .then(r => {
+        setOptions({
+          formateurs_disponibles: r.data.formateurs_disponibles || [],
+          formateurs_tous:        r.data.formateurs_tous        || [],
+          secteurs:               r.data.secteurs               || [],
+        });
+      })
+      .catch(() => {});
   };
 
-  /* ── NOUVEAU : auto-fill nom quand on sélectionne un formateur ── */
+  /* ════════════════════════════════════════
+     HANDLERS SELECT
+  ════════════════════════════════════════ */
+
   const handleFormateurChange = (e) => {
     const id = e.target.value;
-    const f  = options.formateurs.find(f => String(f.id) === String(id));
+    const f  = options.formateurs_disponibles.find(x => String(x.id) === String(id));
     setForm(p => ({
       ...p,
       formateur_id: id,
-      name: f ? f.nom : "",   // auto-fill nom, vide si désélectionné
+      name:  f ? f.nom : p.name,
+      email: f ? generateEmail(f.nom) : p.email,
     }));
   };
 
-  /* ── Modal ── */
-  const openAdd = () => {
-    fetchOptions();
-    setEditing(null);
-    setForm({ name: "", email: "", password: "", password_confirmation: "", role: "formateur", formateur_id: "", secteur_id: "" });
-    setErrors({});
-    setModal(true);
+  const handlePoleFormateurChange = (e) => {
+    const id = e.target.value;
+    const f  = options.formateurs_tous.find(x => String(x.id) === String(id));
+    setForm(p => ({
+      ...p,
+      formateur_id: id,
+      name:  f ? f.nom : p.name,
+      email: f ? generateEmail(f.nom) : p.email,
+    }));
   };
 
-  const openEdit = (u) => {
-    fetchOptions(u.id);
-    setEditing(u);
+  const handleSecteurChange = (e) => {
+    setForm(p => ({ ...p, secteur_id: e.target.value }));
+  };
+
+  /* ── Changement rôle : reset formateur/secteur, conserver name/email si même rôle ── */
+  const handleRoleChange = (newRole) => {
+    setForm(p => ({
+      ...p,
+      role:         newRole,
+      formateur_id: "",
+      secteur_id:   "",
+      name:         newRole !== p.role ? "" : p.name,
+      email:        newRole !== p.role ? "" : p.email,
+    }));
+  };
+
+  /* ── Modal open/close ── */
+  const openAdd = async () => {
+    setEditing(null);
     setForm({
-      name: u.name, email: u.email,
+      name: "", email: "",
       password: "", password_confirmation: "",
-      role: u.role,
-      formateur_id: u.formateur_id || "",
-      secteur_id:   u.secteur_id   || "",
+      role: "formateur",
+      formateur_id: "", secteur_id: "",
     });
     setErrors({});
+    await fetchOptions();
     setModal(true);
   };
 
+  const openEdit = async (u) => {
+    setEditing(u);
+    setForm({
+      name:                  u.name,
+      email:                 u.email,
+      password:              "",
+      password_confirmation: "",
+      role:                  u.role,
+      formateur_id:          u.formateur_id ? String(u.formateur_id) : "",
+      secteur_id:            u.secteur_id   ? String(u.secteur_id)   : "",
+    });
+    setErrors({});
+    await fetchOptions(u.id);
+    setModal(true);
+  };
+
+  /* ── Submit ── */
   const submit = async () => {
-    setSaving(true); setErrors({});
+    setSaving(true);
+    setErrors({});
     try {
       if (editing) {
         await axios.put(`/users/${editing.id}`, form);
@@ -137,20 +200,29 @@ export default function Utilisateurs() {
         flash("Utilisateur créé avec succès.");
       }
       setModal(false);
-      fetchData();
+      if (!editing) { setSearch(""); setRole(""); }
+      setPage(1);
+      axios.get("/users", { params: { page: 1 } })
+        .then(r => { setData(r.data.data || []); setMeta(r.data); setCounts(r.data.counts || {}); })
+        .catch(() => {});
     } catch (e) {
       if (e.response?.status === 422) setErrors(e.response.data.errors || {});
       else flash(e.response?.data?.message || "Erreur.", "err");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
+  /* ── Delete ── */
   const remove = async (u) => {
     if (!window.confirm(`Supprimer le compte de ${u.name} ?`)) return;
     try {
       await axios.delete(`/users/${u.id}`);
       flash("Utilisateur supprimé.");
       fetchData();
-    } catch (e) { flash(e.response?.data?.message || "Erreur.", "err"); }
+    } catch (e) {
+      flash(e.response?.data?.message || "Erreur.", "err");
+    }
   };
 
   /* ── Filtres ── */
@@ -158,8 +230,21 @@ export default function Utilisateurs() {
   const activeCount  = [search, filterRole].filter(Boolean).length;
   const resetFilters = () => { setSearch(""); setRole(""); setPage(1); };
 
+  /* ── Colonne "Secteur" ── */
+  const renderSecteur = (u) => {
+    if (u.role === "pole") {
+      return u.secteur ? (
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ color: "#7c3aed", display: "flex" }}>{Icons.target}</span>
+          <strong style={{ fontSize: 12 }}>{u.secteur.nom}</strong>
+        </span>
+      ) : <em style={{ color: "var(--sl3)", fontSize: 12 }}>—</em>;
+    }
+    return <em style={{ color: "var(--sl3)", fontSize: 12 }}>—</em>;
+  };
+
   /* ════════════════════════════════════════
-     RENDU
+     RENDU PRINCIPAL
   ════════════════════════════════════════ */
   return (
     <div>
@@ -187,7 +272,7 @@ export default function Utilisateurs() {
         </div>
       )}
 
-      {/* ── KPI cards rôles (cliquables pour filtrer) ── */}
+      {/* ── KPI cards ── */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         {Object.entries(ROLE_CFG).map(([role, cfg]) => (
           <div key={role}
@@ -270,7 +355,7 @@ export default function Utilisateurs() {
           </div>
         </div>
 
-        {/* Contenu */}
+        {/* Tableau */}
         {loading ? (
           <div className="loader">
             <div className="loader-spinner" />
@@ -279,20 +364,19 @@ export default function Utilisateurs() {
         ) : data.length === 0 ? (
           <div className="empty">
             <div className="empty-title">Aucun utilisateur trouvé</div>
-            <div className="empty-desc">
-              Créez des comptes pour vos formateurs et responsables de pôle
-            </div>
+            <div className="empty-desc">Créez des comptes pour vos formateurs et responsables de pôle</div>
           </div>
         ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <table style={{ minWidth: 750 }}>
+            <table style={{ minWidth: 800 }}>
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
                   <th>Utilisateur</th>
                   <th>Email</th>
                   <th>Rôle</th>
-                  <th>Lié à</th>
+                  <th>Secteur</th>
+                  <th>Mot de passe</th>
                   <th>Statut</th>
                   <th style={{ width: 90 }}>Actions</th>
                 </tr>
@@ -306,7 +390,7 @@ export default function Utilisateurs() {
                         {(page - 1) * 15 + i + 1}
                       </td>
 
-                      {/* Nom */}
+                      {/* Utilisateur */}
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <div style={{
@@ -332,23 +416,19 @@ export default function Utilisateurs() {
                       {/* Rôle */}
                       <td><RoleBadge role={u.role} /></td>
 
-                      {/* Lié à */}
+                      {/* Secteur */}
                       <td style={{ fontSize: 12.5, color: "var(--sl6)" }}>
-                        {u.role === "formateur" && u.formateur ? (
-                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            {u.formateur.nom}
-                            <span style={{ color: "var(--sl4)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                              · {u.formateur.mle}
-                            </span>
-                          </span>
-                        ) : u.role === "pole" && u.secteur ? (
-                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ color: "var(--sl4)", display: "flex" }}>{Icons.target}</span>
-                            {u.secteur.nom}
-                          </span>
-                        ) : (
-                          <span style={{ color: "var(--sl3)", fontStyle: "italic", fontSize: 12 }}>—</span>
-                        )}
+                        {renderSecteur(u)}
+                      </td>
+
+                      {/* Mot de passe — masqué */}
+                      <td>
+                        <span style={{
+                          fontFamily: "var(--font-mono)", fontSize: 13,
+                          color: "var(--sl4)", letterSpacing: 2,
+                        }}>
+                          ••••••••
+                        </span>
                       </td>
 
                       {/* Statut */}
@@ -363,9 +443,11 @@ export default function Utilisateurs() {
                         <button className="btn-icon btn-icon-edit" title="Modifier" onClick={() => openEdit(u)}>
                           {Icons.edit}
                         </button>
-                        <button className="btn-icon btn-icon-del" title="Supprimer" onClick={() => remove(u)}>
-                          {Icons.trash}
-                        </button>
+                        {u.role !== "directeur" && (
+                          <button className="btn-icon btn-icon-del" title="Supprimer" onClick={() => remove(u)}>
+                            {Icons.trash}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -378,9 +460,7 @@ export default function Utilisateurs() {
         {/* Pagination */}
         {meta?.last_page > 1 && (
           <div className="pagination">
-            <button className="pg-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-              ‹
-            </button>
+            <button className="pg-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
             {Array.from({ length: meta.last_page }, (_, i) => i + 1)
               .filter(p => p === 1 || p === meta.last_page || Math.abs(p - page) <= 2)
               .map((p, idx, arr) => (
@@ -388,27 +468,22 @@ export default function Utilisateurs() {
                   {idx > 0 && arr[idx - 1] !== p - 1 && (
                     <span style={{ padding: "0 4px", color: "var(--sl4)" }}>…</span>
                   )}
-                  <button
-                    className={`pg-btn ${page === p ? "active" : ""}`}
-                    onClick={() => setPage(p)}
-                  >
+                  <button className={`pg-btn ${page === p ? "active" : ""}`} onClick={() => setPage(p)}>
                     {p}
                   </button>
                 </span>
               ))}
-            <button className="pg-btn" onClick={() => setPage(p => Math.min(meta.last_page, p + 1))} disabled={page === meta.last_page}>
-              ›
-            </button>
+            <button className="pg-btn" onClick={() => setPage(p => Math.min(meta.last_page, p + 1))} disabled={page === meta.last_page}>›</button>
           </div>
         )}
       </div>
 
       {/* ════════════════════════════════════════
-          MODAL — Créer / Modifier utilisateur
+          MODAL
       ════════════════════════════════════════ */}
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
-          <div className="modal" style={{ width: 540 }}>
+          <div className="modal" style={{ width: 560 }}>
 
             <div className="modal-header">
               <div className="modal-title">
@@ -417,7 +492,7 @@ export default function Utilisateurs() {
               <button className="modal-close" onClick={() => setModal(false)}>{Icons.close}</button>
             </div>
 
-            {/* ── Rôle selector ── */}
+            {/* ── Sélection du rôle ── */}
             <div className="form-group">
               <label className="form-label">Rôle *</label>
               <div style={{ display: "flex", gap: 8 }}>
@@ -425,7 +500,7 @@ export default function Utilisateurs() {
                   <button
                     key={role}
                     type="button"
-                    onClick={() => setForm(p => ({ ...p, role, formateur_id: "", secteur_id: "", name: "", email: "" }))}
+                    onClick={() => handleRoleChange(role)}
                     style={{
                       flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                       border: `2px solid ${form.role === role ? cfg.color : "var(--border)"}`,
@@ -442,121 +517,188 @@ export default function Utilisateurs() {
               </div>
             </div>
 
-            {/* ── Formateur link — AFFICHÉ EN PREMIER pour rôle formateur ── */}
+            {/* ════ RÔLE : FORMATEUR ════ */}
             {form.role === "formateur" && (
-              <div className="form-group">
-                <label className="form-label">Formateur lié *</label>
-                {options.formateurs.length === 0 ? (
-                  <div style={{
-                    padding: "10px 14px", borderRadius: 8,
-                    background: "#fffbeb", border: "1px solid #fde68a",
-                    fontSize: 12, color: "#92400e",
-                    display: "flex", alignItems: "center", gap: 8,
-                  }}>
-                    Tous les formateurs actifs ont déjà un compte utilisateur.
+              <>
+                <div className="form-group">
+                  <label className="form-label">Nom du formateur *</label>
+                  {options.formateurs_disponibles.length === 0 ? (
+                    <div style={{
+                      padding: "10px 14px", borderRadius: 8,
+                      background: "#fffbeb", border: "1px solid #fde68a",
+                      fontSize: 12, color: "#92400e",
+                    }}>
+                      Tous les formateurs actifs ont déjà un compte utilisateur.
+                    </div>
+                  ) : (
+                    <select className="form-select" value={form.formateur_id} onChange={handleFormateurChange}>
+                      <option value="">— Sélectionner un formateur —</option>
+                      {options.formateurs_disponibles.map(f => (
+                        <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
+                      ))}
+                    </select>
+                  )}
+                  {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Email *
+                    {form.formateur_id && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>
+                        (généré automatiquement — modifiable)
+                      </span>
+                    )}
+                  </label>
+                  <input className="form-input" type="email" placeholder="email@gmail.com"
+                    value={form.email} onChange={setField("email")} />
+                  {errors.email && <div className="field-err">{errors.email[0]}</div>}
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">
+                      Mot de passe {editing
+                        ? <span style={{ color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>(vide = inchangé)</span>
+                        : "*"}
+                    </label>
+                    <input className="form-input" type="password" placeholder="••••••••"
+                      value={form.password} onChange={setField("password")} />
+                    {errors.password && <div className="field-err">{errors.password[0]}</div>}
                   </div>
-                ) : (
-                  <select
-                    className="form-select"
-                    value={form.formateur_id}
-                    onChange={handleFormateurChange}
-                  >
-                    <option value="">— Sélectionner un formateur —</option>
-                    {options.formateurs.map(f => (
-                      <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
-                    ))}
-                  </select>
-                )}
-                {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
-              </div>
+                  <div className="form-group">
+                    <label className="form-label">Confirmer</label>
+                    <input className="form-input" type="password" placeholder="••••••••"
+                      value={form.password_confirmation} onChange={setField("password_confirmation")} />
+                  </div>
+                </div>
+              </>
             )}
 
-            {/* ── Nom + Email ── */}
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Nom complet *</label>
-                <input
-                  className="form-input"
-                  placeholder="Ex: AMINE MAJID"
-                  value={form.name}
-                  onChange={set("name")}
-                  readOnly={form.role === "formateur" && !!form.formateur_id}
-                  style={
-                    form.role === "formateur" && !!form.formateur_id
-                      ? { background: "var(--n1)", color: "var(--sl5)", cursor: "not-allowed" }
-                      : {}
-                  }
-                />
-                {errors.name && <div className="field-err">{errors.name[0]}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email *</label>
-                <input
-                  className="form-input"
-                  type="email"
-                  placeholder="email@ista.ma"
-                  value={form.email}
-                  onChange={set("email")}
-                />
-                {errors.email && <div className="field-err">{errors.email[0]}</div>}
-              </div>
-            </div>
-
-            {/* ── Password ── */}
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">
-                  Mot de passe{" "}
-                  {editing
-                    ? <span style={{ color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>(vide = inchangé)</span>
-                    : "*"}
-                </label>
-                <input className="form-input" type="password" placeholder="••••••••"
-                  value={form.password} onChange={set("password")} />
-                {errors.password && <div className="field-err">{errors.password[0]}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Confirmer</label>
-                <input className="form-input" type="password" placeholder="••••••••"
-                  value={form.password_confirmation} onChange={set("password_confirmation")} />
-              </div>
-            </div>
-
-            {/* ── Secteur link ── */}
+            {/* ════ RÔLE : PÔLE ════ */}
             {form.role === "pole" && (
-              <div className="form-group">
-                <label className="form-label">Secteur / Pôle lié *</label>
-                {options.secteurs.length === 0 ? (
-                  <div style={{
-                    padding: "10px 14px", borderRadius: 8,
-                    background: "#fffbeb", border: "1px solid #fde68a",
-                    fontSize: 12, color: "#92400e",
-                    display: "flex", alignItems: "center", gap: 8,
-                  }}>
-                    Tous les secteurs ont déjà un responsable de pôle.
+              <>
+                <div className="form-group">
+                  <label className="form-label">Responsable (formateur) *</label>
+                  {options.formateurs_tous.length === 0 ? (
+                    <div style={{
+                      padding: "10px 14px", borderRadius: 8,
+                      background: "#fffbeb", border: "1px solid #fde68a",
+                      fontSize: 12, color: "#92400e",
+                    }}>
+                      Aucun formateur actif disponible.
+                    </div>
+                  ) : (
+                    <select className="form-select" value={form.formateur_id} onChange={handlePoleFormateurChange}>
+                      <option value="">— Sélectionner le responsable —</option>
+                      {options.formateurs_tous.map(f => (
+                        <option key={f.id} value={f.id}>{f.nom} · {f.mle}</option>
+                      ))}
+                    </select>
+                  )}
+                  {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Secteur / Pôle *</label>
+                  {options.secteurs.length === 0 ? (
+                    <div style={{
+                      padding: "10px 14px", borderRadius: 8,
+                      background: "#fffbeb", border: "1px solid #fde68a",
+                      fontSize: 12, color: "#92400e",
+                    }}>
+                      Tous les secteurs ont déjà un responsable de pôle.
+                    </div>
+                  ) : (
+                    <select className="form-select" value={form.secteur_id} onChange={handleSecteurChange}>
+                      <option value="">— Sélectionner un secteur —</option>
+                      {options.secteurs.map(s => (
+                        <option key={s.id} value={s.id}>{s.nom}</option>
+                      ))}
+                    </select>
+                  )}
+                  {errors.secteur_id && <div className="field-err">{errors.secteur_id[0]}</div>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Email *
+                    {form.formateur_id && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>
+                        (généré automatiquement — modifiable)
+                      </span>
+                    )}
+                  </label>
+                  <input className="form-input" type="email" placeholder="email@gmail.com"
+                    value={form.email} onChange={setField("email")} />
+                  {errors.email && <div className="field-err">{errors.email[0]}</div>}
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">
+                      Mot de passe {editing
+                        ? <span style={{ color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>(vide = inchangé)</span>
+                        : "*"}
+                    </label>
+                    <input className="form-input" type="password" placeholder="••••••••"
+                      value={form.password} onChange={setField("password")} />
+                    {errors.password && <div className="field-err">{errors.password[0]}</div>}
                   </div>
-                ) : (
-                  <select className="form-select" value={form.secteur_id} onChange={set("secteur_id")}>
-                    <option value="">— Sélectionner un secteur —</option>
-                    {options.secteurs.map(s => (
-                      <option key={s.id} value={s.id}>{s.nom}</option>
-                    ))}
-                  </select>
-                )}
-                {errors.secteur_id && <div className="field-err">{errors.secteur_id[0]}</div>}
-              </div>
+                  <div className="form-group">
+                    <label className="form-label">Confirmer</label>
+                    <input className="form-input" type="password" placeholder="••••••••"
+                      value={form.password_confirmation} onChange={setField("password_confirmation")} />
+                  </div>
+                </div>
+              </>
             )}
 
-            {/* ── Directeur info ── */}
+            {/* ════ RÔLE : DIRECTEUR ════ */}
             {form.role === "directeur" && (
-              <div style={{
-                padding: "11px 14px", borderRadius: 9, marginBottom: 14,
-                background: "var(--g0)", border: "1px solid var(--g1)",
-                fontSize: 12.5, color: "var(--g6)",
-                display: "flex", alignItems: "center", gap: 8,
-              }}>
-                Ce compte aura accès complet au tableau de bord directeur.
-              </div>
+              <>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Nom complet *</label>
+                    <input className="form-input" placeholder="Ex: AMINE MAJID"
+                      value={form.name} onChange={setField("name")} />
+                    {errors.name && <div className="field-err">{errors.name[0]}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email *</label>
+                    <input className="form-input" type="email" placeholder="email@gmail.com"
+                      value={form.email} onChange={setField("email")} />
+                    {errors.email && <div className="field-err">{errors.email[0]}</div>}
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">
+                      Mot de passe {editing
+                        ? <span style={{ color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>(vide = inchangé)</span>
+                        : "*"}
+                    </label>
+                    <input className="form-input" type="password" placeholder="••••••••"
+                      value={form.password} onChange={setField("password")} />
+                    {errors.password && <div className="field-err">{errors.password[0]}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Confirmer</label>
+                    <input className="form-input" type="password" placeholder="••••••••"
+                      value={form.password_confirmation} onChange={setField("password_confirmation")} />
+                  </div>
+                </div>
+
+                <div style={{
+                  padding: "11px 14px", borderRadius: 9, marginBottom: 14,
+                  background: "var(--g0)", border: "1px solid var(--g1)",
+                  fontSize: 12.5, color: "var(--g6)",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  Ce compte aura accès complet au tableau de bord directeur.
+                </div>
+              </>
             )}
 
             <div className="modal-footer">

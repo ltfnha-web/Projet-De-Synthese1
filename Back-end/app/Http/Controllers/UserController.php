@@ -33,7 +33,6 @@ class UserController extends Controller
 
         $paginated = $query->paginate(15);
 
-        // Compteurs globaux (indépendants des filtres) pour les KPI cards
         $countsRaw = User::selectRaw('role, count(*) as total')
             ->groupBy('role')
             ->pluck('total', 'role');
@@ -57,23 +56,29 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'         => 'required|string|max:100',
             'email'        => 'required|email|unique:users,email',
             'password'     => 'required|string|min:6|confirmed',
             'role'         => 'required|in:directeur,formateur,pole',
-            'formateur_id' => 'nullable|exists:formateurs,id|required_if:role,formateur',
+            'name'         => 'required_if:role,directeur|nullable|string|max:100',
+            'formateur_id' => 'nullable|exists:formateurs,id|required_if:role,formateur|required_if:role,pole',
             'secteur_id'   => 'nullable|exists:secteurs,id|required_if:role,pole',
         ]);
 
+        $name = $request->name;
+        if (in_array($request->role, ['formateur', 'pole']) && $request->formateur_id) {
+            $formateur = Formateur::find($request->formateur_id);
+            $name = $formateur ? $formateur->nom : $request->name;
+        }
+
         $user = User::create([
-            'name'         => $request->name,
+            'name'         => $name,
             'email'        => $request->email,
             'password'     => Hash::make($request->password),
             'role'         => $request->role,
             'is_active'    => true,
             'statut'       => 'actif',
-            'formateur_id' => $request->role === 'formateur' ? $request->formateur_id : null,
-            'secteur_id'   => $request->role === 'pole'      ? $request->secteur_id   : null,
+            'formateur_id' => in_array($request->role, ['formateur', 'pole']) ? $request->formateur_id : null,
+            'secteur_id'   => $request->role === 'pole' ? $request->secteur_id : null,
         ]);
 
         return response()->json($user->load(['formateur', 'secteur']), 201);
@@ -95,20 +100,26 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name'         => 'required|string|max:100',
             'email'        => 'required|email|unique:users,email,' . $user->id,
             'password'     => 'nullable|string|min:6|confirmed',
             'role'         => 'required|in:directeur,formateur,pole',
-            'formateur_id' => 'nullable|exists:formateurs,id|required_if:role,formateur',
+            'name'         => 'required_if:role,directeur|nullable|string|max:100',
+            'formateur_id' => 'nullable|exists:formateurs,id|required_if:role,formateur|required_if:role,pole',
             'secteur_id'   => 'nullable|exists:secteurs,id|required_if:role,pole',
         ]);
 
+        $name = $request->name;
+        if (in_array($request->role, ['formateur', 'pole']) && $request->formateur_id) {
+            $formateur = Formateur::find($request->formateur_id);
+            $name = $formateur ? $formateur->nom : $request->name;
+        }
+
         $user->update([
-            'name'         => $request->name,
+            'name'         => $name,
             'email'        => $request->email,
             'role'         => $request->role,
-            'formateur_id' => $request->role === 'formateur' ? $request->formateur_id : null,
-            'secteur_id'   => $request->role === 'pole'      ? $request->secteur_id   : null,
+            'formateur_id' => in_array($request->role, ['formateur', 'pole']) ? $request->formateur_id : null,
+            'secteur_id'   => $request->role === 'pole' ? $request->secteur_id : null,
         ]);
 
         if ($request->filled('password')) {
@@ -136,40 +147,61 @@ class UserController extends Controller
 
     /* ════════════════════════════════════════
        OPTIONS — dropdowns modal
-       GET /api/users/options?editing_user_id=X
+       GET /users/options?editing_user_id=X
+
+       ✅ FIX CRITIQUE : ->pluck() retourne une Collection.
+       ->whereNotIn() sur une Collection Laravel ne filtre PAS
+       comme un whereNotIn() SQL. Il faut :
+         1. ->toArray() sur le pluck pour avoir un vrai array PHP
+         2. Utiliser une query Eloquent directe avec whereNotIn()
+            au lieu de filtrer la Collection en PHP.
     ════════════════════════════════════════ */
 
-public function options(Request $request)
-{
-    $editingUserId = $request->query('editing_user_id');
+    public function options(Request $request)
+    {
+        $editingUserId = $request->query('editing_user_id');
 
-    $formateursAvecCompte = User::where('role', 'formateur')
-        ->whereNotNull('formateur_id')
-        ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
-        ->pluck('formateur_id');
+        /* TOUS les formateurs actifs — pour le rôle pole */
+        $formateursTous = Formateur::where('statut', 'actif')
+            ->select('id', 'nom', 'mle')
+            ->orderBy('nom')
+            ->get();
 
-    $formateurs = Formateur::whereNotIn('id', $formateursAvecCompte)
-        ->where('statut', 'actif')
-        ->select('id', 'nom', 'mle')
-        ->orderBy('nom')
-        ->get();
+        /* Formateurs disponibles : aucun compte utilisateur "formateur" lié (par id OU par nom) */
+        $formateursDisponibles = Formateur::where('statut', 'actif')
+            ->whereNotExists(function ($sub) use ($editingUserId) {
+                $sub->select(DB::raw(1))
+                    ->from('users')
+                    ->where('users.role', 'formateur')
+                    ->where(function ($q) {
+                        $q->whereColumn('users.formateur_id', 'formateurs.id')
+                          ->orWhereColumn('users.name', 'formateurs.nom');
+                    })
+                    ->when($editingUserId, fn($q) => $q->where('users.id', '!=', $editingUserId));
+            })
+            ->select('id', 'nom', 'mle')
+            ->orderBy('nom')
+            ->get();
 
-    $secteurs = DB::table('pole_secteur')
-        ->join('formateurs', 'pole_secteur.formateur_id', '=', 'formateurs.id')
-        ->join('secteurs',   'pole_secteur.secteur_id',   '=', 'secteurs.id')
-        ->select(
-            'pole_secteur.id',
-            'secteurs.nom         as nom',
-            'formateurs.nom       as responsable_nom'
-        )
-        ->orderBy('secteurs.nom')
-        ->get();
+        /* IDs (array PHP) des secteurs avec responsable pole existant */
+        $secteursAvecPole = User::where('role', 'pole')
+            ->whereNotNull('secteur_id')
+            ->when($editingUserId, fn($q) => $q->where('id', '!=', $editingUserId))
+            ->pluck('secteur_id')
+            ->toArray();  // ← FIX : toArray() obligatoire
 
-    return response()->json([
-        'formateurs' => $formateurs,
-        'secteurs'   => $secteurs,
-    ]);
-}
+        $secteurs = Secteur::whereNotIn('id', $secteursAvecPole)
+            ->select('id', 'nom')
+            ->orderBy('nom')
+            ->get();
+
+        return response()->json([
+            'formateurs_disponibles' => $formateursDisponibles,
+            'formateurs_tous'        => $formateursTous,
+            'secteurs'               => $secteurs,
+        ]);
+    }
+
     /* ════════════════════════════════════════
        STATS — dashboard
     ════════════════════════════════════════ */
@@ -205,7 +237,6 @@ public function options(Request $request)
             ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee));
 
         $totalFormateurs   = Formateur::count();
-        $totalSurveillants = User::where('role', 'surveillant')->count();
         $totalFilieres     = $secteurId ? Filiere::where('secteur_id', $secteurId)->count() : Filiere::count();
         $totalSecteurs     = Secteur::count();
         $totalGroupes      = (clone $groupeScope)->count('groupes.id');
@@ -350,7 +381,6 @@ public function options(Request $request)
             'total_modules'        => $totalModules,
             'total_filieres'       => $totalFilieres,
             'total_secteurs'       => $totalSecteurs,
-            'total_surveillants'   => $totalSurveillants,
             'mh_realisee_totale'   => round($mhRealisee),
             'mh_restante_totale'   => round($mhRestante),
             'mh_drif_totale'       => round($mhDrif),
