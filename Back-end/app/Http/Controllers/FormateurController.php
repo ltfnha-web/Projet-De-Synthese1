@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Formateur;
+use App\Models\FormateurEmploi;
 use Illuminate\Http\Request;
 
 class FormateurController extends Controller
@@ -59,5 +60,33 @@ class FormateurController extends Controller
     {
         $formateur->delete();
         return response()->json(['message' => 'Formateur supprimé.']);
+    }
+
+    public function emploi(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user->formateur_id) {
+            return response()->json(['data' => []]);
+        }
+
+        $sort = $request->query('sort', 'desc'); // desc = récent, asc = ancien
+
+        $list = FormateurEmploi::where('formateur_id', $user->formateur_id)
+            ->orderBy('created_at', $sort === 'asc' ? 'asc' : 'desc')
+            ->get()
+            ->map(fn($e) => [
+                'id'         => $e->id,
+                'semestre'   => $e->semestre,
+                'grille'     => $e->grille,
+                'created_at' => $e->created_at?->format('d/m/Y'),
+            ]);
+
+        return response()->json(['data' => $list]);
+    }
+
+    public function planning(Request $request)
+    {
+        return response()->json(['data' => []]);
     }
 }

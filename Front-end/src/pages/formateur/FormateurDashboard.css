@@ -1,0 +1,106 @@
+/* ═══════════════════════════════════════════
+   FORMATEUR DASHBOARD — Responsive & Transitions
+═══════════════════════════════════════════ */
+
+/* ── Navbar ─────────────────────────────── */
+.fmd-nav {
+  transition: box-shadow 0.2s;
+}
+
+.fmd-nav button {
+  transition: background 0.15s, border-color 0.15s, color 0.15s !important;
+}
+
+/* ── Cards ─────────────────────────────── */
+.fmd-kpi-card {
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.fmd-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(0,0,0,.10);
+}
+
+.fmd-emploi-card {
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+/* ── Viewer buttons ─────────────────────── */
+.fmd-viewer-btn {
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.fmd-viewer-btn:hover { opacity: 0.85; }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════ */
+
+/* Tablet */
+@media (max-width: 900px) {
+  .fmd-nav {
+    padding: 0 18px !important;
+  }
+  .fmd-banner {
+    padding: 22px 22px !important;
+  }
+}
+
+/* Small tablet / large phone */
+@media (max-width: 700px) {
+  .fmd-nav {
+    padding: 0 14px !important;
+    height: 52px !important;
+  }
+  .fmd-banner {
+    padding: 18px 16px !important;
+    border-radius: 12px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .fmd-banner-stat {
+    width: 100%;
+    text-align: left !important;
+    padding: 12px 16px !important;
+  }
+  .fmd-toolbar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+  .fmd-toolbar-controls {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 540px) {
+  .fmd-nav-brand-text {
+    display: none;
+  }
+  .fmd-nav-username {
+    display: none;
+  }
+  .fmd-logout-text {
+    display: none;
+  }
+  .fmd-nav {
+    padding: 0 12px !important;
+    gap: 10px !important;
+  }
+  .fmd-banner {
+    padding: 16px 14px !important;
+  }
+  .fmd-banner-stat {
+    display: none;
+  }
+  .fmd-kpis {
+    gap: 10px !important;
+  }
+}
+
+/* Extra small */
+@media (max-width: 400px) {
+  .fmd-kpis > div {
+    flex: 1 1 100% !important;
+  }
+}

@@ -4,9 +4,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html { -webkit-font-smoothing: antialiased; }
-a { text-decoration: none; color: inherit; }
-body { font-family: 'DM Sans', sans-serif; background: #f8fafc; color: #18181b; }
+html { -webkit-font-smoothing: antialiased; cursor: default; }
+body { font-family: 'DM Sans', sans-serif; background: #f8fafc; color: #18181b; cursor: default; }
+a { text-decoration: none; color: inherit; cursor: pointer; }
+input, textarea { cursor: text; }
+button, select { cursor: pointer; }
 
 /* ═══════════════════════════════════════════
    NAVBAR

@@ -4,8 +4,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html { -webkit-font-smoothing: antialiased; }
-a { text-decoration: none; color: inherit; }
+html { -webkit-font-smoothing: antialiased; cursor: default; }
+body { cursor: default; }
+a { text-decoration: none; color: inherit; cursor: pointer; }
+input, textarea { cursor: text; }
+button, select { cursor: pointer; }
 
 /* ── Shared Navbar ────────────────────────── */
 .navbar {
@@ -262,15 +265,24 @@ a { text-decoration: none; color: inherit; }
 
 .input-toggle {
   position: absolute;
-  right: 13px; top: 50%;
+  right: 6px; top: 50%;
   transform: translateY(-50%);
   background: none; border: none;
   cursor: pointer;
   color: #a1a1aa;
-  display: flex; padding: 0;
-  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 6px;
+  z-index: 2;
+  transition: color 0.2s, background 0.15s;
 }
-.input-toggle:hover { color: #22c55e; }
+.input-toggle:hover { color: #22c55e; background: rgba(34,197,94,0.08); }
+/* Prevent the global button:active scale from breaking the absolute positioning */
+.input-toggle:active { transform: translateY(-50%) !important; }
 
 .form-input {
   width: 100%;
@@ -348,4 +360,11 @@ a { text-decoration: none; color: inherit; }
   .login-main { grid-template-columns: 1fr; }
   .login-left { display: none; }
   .login-right { padding: 2rem 1.25rem; }
+}
+@media (max-width: 480px) {
+  .navbar { padding: 0 16px; }
+  .brand-name { font-size: 12px; }
+  .login-right { padding: 1.5rem 1rem; }
+  .login-card { padding: 2rem 1.5rem; }
+  .login-hero-title { font-size: 30px; }
 }

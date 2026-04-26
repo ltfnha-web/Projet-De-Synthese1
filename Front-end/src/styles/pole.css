@@ -372,6 +372,8 @@
   .filters-bar          { flex-direction: column; align-items: stretch; }
   .filters-bar__actions { margin-left: 0; }
   .table-toolbar        { flex-direction: column; gap: 8px; }
+  .search-input         { width: 100%; }
+  .page-tabs            { flex-wrap: wrap; }
 }
 
 @media (max-width: 480px) {
@@ -379,4 +381,6 @@
   .pole-main            { padding: 8px; }
   .pole-navbar          { padding: 0 12px; }
   .pole-navbar__badge   { display: none; }
+  .filters-bar          { padding: 10px 12px; }
+  .btn                  { font-size: 12px; padding: 5px 10px; }
 }

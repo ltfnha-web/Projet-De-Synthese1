@@ -78,8 +78,9 @@
 }
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; font-family: var(--font); }
-body { background: var(--bg); color: var(--n9); }
-a { text-decoration: none; color: inherit; }
+body { background: var(--bg); color: var(--n9); cursor: default; }
+a { text-decoration: none; color: inherit; cursor: pointer; }
+input, textarea, [contenteditable="true"] { cursor: text; }
 
 /* ═══════════════════════════════════════════════════════════
    WRAPPER
@@ -189,6 +190,11 @@ a { text-decoration: none; color: inherit; }
   font-size: 10px; font-weight: 700;
   padding: 1px 6px; border-radius: 20px; line-height: 1.5;
   margin-left: 2px; flex-shrink: 0;
+}
+
+.al-nav-divider {
+  width: 1px; height: 20px; background: var(--border);
+  margin: 0 6px; flex-shrink: 0;
 }
 
 /* Right section */
@@ -366,8 +372,8 @@ tbody td { padding: 12px 14px; font-size: 13.5px; color: var(--n6); vertical-ali
 .pg-btn.active { background: var(--g4); border-color: var(--g4); color: #111; font-weight: 700; box-shadow: var(--sh-g); }
 
 /* Inputs & Buttons */
-button { transition: all .15s; cursor: pointer; }
-button:active { transform: scale(.97) !important; }
+button { transition: background .15s, border-color .15s, color .15s, box-shadow .15s; cursor: pointer; }
+button:not(.input-toggle):not([class*="no-scale"]):active { transform: scale(.97); }
 
 .search-input, .form-input, .form-select {
   height: 36px; padding: 0 12px;
