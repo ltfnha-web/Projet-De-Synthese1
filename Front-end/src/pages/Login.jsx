@@ -168,7 +168,9 @@ export default function Login() {
                   </button>
                 </div>
                 <div className="forgot-row">
-                  <a href="#" className="forgot-link">Mot de passe oublié ?</a>
+                  <Link to="/mot-de-passe-oublie" className="forgot-link">
+                    Mot de passe oublié ?
+                  </Link>
                 </div>
               </div>
 

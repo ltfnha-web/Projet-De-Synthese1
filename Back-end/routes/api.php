@@ -3,6 +3,8 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\StagiaireController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\FormateurController;
 use App\Http\Controllers\GroupeController;
@@ -18,6 +20,18 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
 Route::post('/login', [AuthController::class, 'login']);
+
+// Mot de passe oublié (routes publiques)
+Route::post('/forgot-password',        [PasswordResetController::class, 'sendLink']);
+Route::get('/forgot-password/info',    [PasswordResetController::class, 'getInfo']);
+Route::post('/reset-password',         [PasswordResetController::class, 'reset']);
+
+// Espace Stagiaire (routes publiques)
+Route::get('/stagiaire/filieres', [StagiaireController::class, 'filieres']);
+Route::get('/stagiaire/annees',   [StagiaireController::class, 'annees']);
+Route::get('/stagiaire/groupes',  [StagiaireController::class, 'groupes']);
+Route::get('/stagiaire/emploi',   [StagiaireController::class, 'emploi']);
+Route::get('/stagiaire/modules',  [StagiaireController::class, 'modules']);
 
 Route::middleware('auth:sanctum')->group(function () {
 

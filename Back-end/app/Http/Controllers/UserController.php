@@ -119,8 +119,8 @@ class UserController extends Controller
             'name'         => $name,
             'email'        => $request->email,
             'role'         => $request->role,
-            'formateur_id' => in_array($request->role, ['formateur', 'pole']) ? $request->formateur_id : null,
-            'secteur_id'   => $request->role === 'pole' ? $request->secteur_id : null,
+            'formateur_id'   => in_array($request->role, ['formateur', 'pole']) ? $request->formateur_id : null,
+            'secteur_id'     => $request->role === 'pole' ? $request->secteur_id : null,
         ]);
 
         if ($request->filled('password')) {

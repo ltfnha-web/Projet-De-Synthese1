@@ -3,8 +3,10 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import './styles/stylePole.css';
 
-import Home                  from "./pages/Home";
-import Login                 from "./pages/Login";
+import Home                       from "./pages/Home";
+import Login                      from "./pages/Login";
+import MotDePasseOublie           from "./pages/MotDePasseOublie";
+import ReinitialisationMotDePasse from "./pages/ReinitialisationMotDePasse";
 import EspaceStagiaire       from "./pages/EspaceStagiaire";
 import AdminLayout           from "./components/admin/AdminLayout";
 import DirecteurDashboard    from "./pages/directeur/Dashboard";
@@ -44,6 +46,8 @@ export default function App() {
           {/* Pages publiques */}
           <Route path="/home"  element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/mot-de-passe-oublie"           element={<MotDePasseOublie />} />
+          <Route path="/reinitialisation-mot-de-passe" element={<ReinitialisationMotDePasse />} />
           <Route path="/"      element={<HomeRedirect />} />
 
           {/* Espace Stagiaire */}
