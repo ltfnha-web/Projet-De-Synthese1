@@ -59,7 +59,7 @@ class ModuleController extends Controller
                 $q->where('type_formation', $request->type_formation)
             )
             ->when($request->filled('exam_type') && $request->exam_type !== '', fn($q) =>
-                $q->where('exam_type', $request->exam_type)
+                $q->where('type_formation', $request->exam_type)
             )
             ->latest();
 

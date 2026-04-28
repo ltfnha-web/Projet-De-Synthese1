@@ -96,8 +96,19 @@ export default function Alertes() {
     { label: "Total alertes",  count: data?.total    || 0, color: "var(--sl6)", bg: "var(--sl1)", icon: Icons.filter, key: "" },
   ];
 
+  // Impression : masquer les filtres et afficher seulement la liste
+  const handlePrint = () => window.print();
+
   return (
     <div>
+      {/* Styles d'impression : masquer filtres, nav, header actions */}
+      <style>{`
+        @media print {
+          .pg-header .btn-secondary, .filter-panel, .pg-header-left .pg-subtitle { display: none !important; }
+          body { background: white !important; }
+        }
+      `}</style>
+
       {/* ── Header ── */}
       <div className="pg-header">
         <div className="pg-header-left">
@@ -106,7 +117,18 @@ export default function Alertes() {
             Groupes et modules nécessitant une intervention — générées automatiquement
           </div>
         </div>
-        <button className="btn-secondary" onClick={fetchData}>{Icons.filter} Actualiser</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-secondary" onClick={fetchData}>{Icons.filter} Actualiser</button>
+          <button className="btn-secondary" onClick={handlePrint} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {/* Icône imprimante */}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 6 2 18 2 18 9"/>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+              <rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Imprimer
+          </button>
+        </div>
       </div>
 
       {/* ── Summary cards ── */}

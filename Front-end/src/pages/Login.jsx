@@ -40,9 +40,6 @@ export default function Login() {
       {/* Navbar */}
       <nav className="navbar">
         <Link to="/" className="brand">
-          <div className="brand-logo">
-            <img src="/logoOfppt.png" alt="logo OFPPT" />
-          </div>
           <div className="brand-info">
             <span className="brand-name">OFPPT</span>
             <span className="brand-sub">Gestion Pédagogique</span>
@@ -58,10 +55,6 @@ export default function Login() {
         {/* Left decoration panel */}
         <div className="login-left">
           <div className="login-left-inner">
-            <div className="login-badge">
-              <div className="badge-dot"></div>
-              Plateforme officielle OFPPT
-            </div>
             <h1 className="login-hero-title">
               Bienvenue sur votre<br />
               <span>espace personnel</span>

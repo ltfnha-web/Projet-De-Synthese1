@@ -216,11 +216,17 @@ class UserController extends Controller
         $creneau   = $request->creneau;
         $annee     = $request->annee;
         $seuil     = $request->seuil;
+        $examType  = $request->exam_type;
+        $groupeId  = $request->groupe_id;
+        $moduleId  = $request->module_id;
 
-        $applyFilters = function ($query) use ($secteurId, $creneau, $annee) {
+        $applyFilters = function ($query) use ($secteurId, $creneau, $annee, $examType, $groupeId, $moduleId) {
             if ($secteurId) $query->where('filieres.secteur_id', $secteurId);
             if ($creneau)   $query->where('groupes.creneau', $creneau);
             if ($annee)     $query->where('groupes.annee_formation', $annee);
+            if ($examType)  $query->where('modules.type_formation', $examType);
+            if ($groupeId)  $query->where('groupes.id', $groupeId);
+            if ($moduleId)  $query->where('modules.id', $moduleId);
             return $query;
         };
 
@@ -232,13 +238,29 @@ class UserController extends Controller
         $groupeScope = Groupe::join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
-            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee));
+            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examType,  fn($q) => $q->whereExists(
+                fn($sub) => $sub->select(DB::raw(1))
+                    ->from('modules')
+                    ->whereColumn('modules.groupe_id', 'groupes.id')
+                    ->where('modules.type_formation', $examType)
+            ))
+            ->when($groupeId,  fn($q) => $q->where('groupes.id', $groupeId))
+            ->when($moduleId,  fn($q) => $q->whereExists(
+                fn($sub) => $sub->select(DB::raw(1))
+                    ->from('modules')
+                    ->whereColumn('modules.groupe_id', 'groupes.id')
+                    ->where('modules.id', $moduleId)
+            ));
 
         $moduleScope = Module::join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
-            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee));
+            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examType,  fn($q) => $q->where('modules.type_formation', $examType))
+            ->when($groupeId,  fn($q) => $q->where('modules.groupe_id', $groupeId))
+            ->when($moduleId,  fn($q) => $q->where('modules.id', $moduleId));
 
         $totalFormateurs   = Formateur::count();
         $totalFilieres     = $secteurId ? Filiere::where('secteur_id', $secteurId)->count() : Filiere::count();
@@ -315,6 +337,13 @@ class UserController extends Controller
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
             ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examType,  fn($q) => $q->whereExists(
+                fn($sub) => $sub->select(DB::raw(1))
+                    ->from('modules')
+                    ->whereColumn('modules.groupe_id', 'groupes.id')
+                    ->where('modules.type_formation', $examType)
+            ))
+            ->when($groupeId,  fn($q) => $q->where('groupes.id', $groupeId))
             ->groupBy('groupes.annee_formation')
             ->orderBy('groupes.annee_formation')
             ->get();
@@ -323,6 +352,12 @@ class UserController extends Controller
             ->join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id')
+            ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
+            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examType,  fn($q) => $q->where('modules.type_formation', $examType))
+            ->when($groupeId,  fn($q) => $q->where('groupes.id', $groupeId))
+            ->when($moduleId,  fn($q) => $q->where('modules.id', $moduleId))
             ->select(
                 'groupes.id as groupe_id',
                 DB::raw('CASE WHEN SUM(modules.mh_drif) > 0
@@ -345,6 +380,13 @@ class UserController extends Controller
 
         $secteursList = Secteur::select('id', 'nom')->orderBy('nom')->get();
 
+        $examTypesList = DB::table('modules')
+            ->whereNotNull('type_formation')
+            ->where('type_formation', '!=', '')
+            ->distinct()
+            ->orderBy('type_formation')
+            ->pluck('type_formation');
+
         $groupesList = [];
         if ($secteurId) {
             $groupesList = Groupe::select('groupes.id', 'groupes.nom', 'groupes.creneau', 'groupes.annee_formation')
@@ -357,7 +399,6 @@ class UserController extends Controller
         }
 
         $modulesList = [];
-        $groupeId    = $request->groupe_id;
 
         if ($secteurId) {
             $modulesList = DB::table('modules')
@@ -399,6 +440,7 @@ class UserController extends Controller
             'par_specialite'       => [],
             'alertes_count'        => $alertesCount,
             'secteurs_list'        => $secteursList,
+            'exam_types_list'      => $examTypesList,
             'groupes_list'         => $groupesList,
             'modules_list'         => $modulesList,
             'filtres_actifs'       => array_filter([
@@ -406,6 +448,9 @@ class UserController extends Controller
                 'creneau'    => $creneau,
                 'annee'      => $annee,
                 'seuil'      => $seuil,
+                'exam_type'  => $examType,
+                'groupe_id'  => $groupeId,
+                'module_id'  => $moduleId,
             ]),
         ]);
     }

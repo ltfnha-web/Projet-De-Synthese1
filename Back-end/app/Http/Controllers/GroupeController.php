@@ -47,11 +47,11 @@ class GroupeController extends Controller
         return response()->json($paginated);
     }
 
-    // Liste filières pour les selects
+    // Liste filières pour les selects (inclut secteur_id pour le filtre côté React)
     public function filieresList()
     {
         return response()->json(
-            \App\Models\Filiere::orderBy('intitule')->get(['id', 'intitule', 'code'])
+            \App\Models\Filiere::orderBy('intitule')->get(['id', 'intitule', 'code', 'secteur_id'])
         );
     }
 }

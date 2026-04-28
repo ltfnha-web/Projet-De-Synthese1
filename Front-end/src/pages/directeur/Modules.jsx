@@ -20,13 +20,19 @@ function ProgressBar({ realisee, drif }) {
 }
 
 const EXAM_TYPE_STYLES = {
-  EFF:         { label: "Fin formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
-  EFM:         { label: "EFM",            bg: "#fff1f2", color: "#be123c", border: "#fecdd3" },
-  Qualifiante: { label: "Qualifiante",    bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-  Passage:     { label: "Passage",        bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
-  "1A":        { label: "1ère Année",     bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
-  "2A":        { label: "2ème Année",     bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" },
-  Aucun:       { label: "Aucun",          bg: "var(--sl1)", color: "var(--sl4)", border: "var(--sl2)" },
+  // Codes courts (EFF, EFP…)
+  EFF:              { label: "Fin Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  EFM:              { label: "EFM",            bg: "#fff1f2", color: "#be123c", border: "#fecdd3" },
+  EFP:              { label: "Passage",        bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
+  Qualifiante:      { label: "Qualifiante",    bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+  Passage:          { label: "Passage",        bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
+  "1A":             { label: "1ère Année",     bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "2A":             { label: "2ème Année",     bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" },
+  Aucun:            { label: "Aucun",          bg: "var(--sl1)", color: "var(--sl4)", border: "var(--sl2)" },
+  // Libellés longs (selon le fichier Excel importé)
+  "Fin de Formation":   { label: "Fin Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  "Fin Formation":      { label: "Fin Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  Diplômante:           { label: "Diplômante",     bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
 };
 
 function ExamTypeBadge({ value }) {
@@ -74,10 +80,16 @@ export default function Modules() {
   const [page,      setPage]      = useState(1);
 
   useEffect(() => {
+    // filieres-list retourne maintenant secteur_id pour le filtrage cascadé
     axios.get("/filieres-list").then(r => setFilieres(r.data)).catch(() => {});
     axios.get("/pole").then(r => setSecteurs(r.data)).catch(() => {});
     axios.get("/formateurs/all").then(r => setFormateurs(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   }, []);
+
+  // Filtrer les filières selon le secteur sélectionné (cascade secteur → filière)
+  const filteredFilieres = secteur
+    ? filieres.filter(f => String(f.secteur_id) === String(secteur))
+    : filieres;
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -151,14 +163,14 @@ export default function Modules() {
                 value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <select className="form-select filter-select" style={filterSelectStyle} value={secteur}
-              onChange={e => { setSecteur(e.target.value); setFiliere(""); setPage(1); }}>
+              onChange={e => { setSecteur(e.target.value); setFiliere(""); setPage(1); /* Réinitialiser filière */ }}>
               <option value="">Tous les secteurs</option>
               {secteurs.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
             </select>
             <select className="form-select filter-select" style={filterSelectStyle} value={filiere}
               onChange={e => { setFiliere(e.target.value); setPage(1); }}>
               <option value="">Toutes les filières</option>
-              {filieres.map(f => <option key={f.id} value={f.id}>{f.intitule}</option>)}
+              {filteredFilieres.map(f => <option key={f.id} value={f.id}>{f.intitule}</option>)}
             </select>
             <select className="form-select filter-select" style={filterSelectStyle} value={formateur}
               onChange={e => { setFormateur(e.target.value); setPage(1); }}>
@@ -218,13 +230,16 @@ export default function Modules() {
                 <option value="Diplômante">Diplômante</option>
                 <option value="Qualifiante">Qualifiante</option>
               </select>
-              <select className="form-select filter-select" style={{ ...filterSelectStyle, minWidth: 170 }} value={examType}
+              <select className="form-select filter-select" style={{ ...filterSelectStyle, minWidth: 180 }} value={examType}
                 onChange={e => { setExamType(e.target.value); setPage(1); }}>
                 <option value="">Type d'examen</option>
                 <option value="EFF">Fin de Formation (EFF)</option>
-                <option value="EFM">EFM</option>
-                <option value="Qualifiante">Qualifiante</option>
+                <option value="Fin de Formation">Fin de Formation</option>
+                <option value="EFP">Passage (EFP)</option>
                 <option value="Passage">Passage</option>
+                <option value="Qualifiante">Qualifiante</option>
+                <option value="Diplômante">Diplômante</option>
+                <option value="EFM">EFM</option>
                 <option value="1A">1ère Année (1A)</option>
                 <option value="2A">2ème Année (2A)</option>
                 <option value="Aucun">Aucun</option>
@@ -278,7 +293,7 @@ export default function Modules() {
                     </td>
                     <td><span className={`badge ${m.eg_et === "EG" ? "badge-info" : "badge-warn"}`}>{m.eg_et || "—"}</span></td>
                     <td style={{ fontSize: 12 }}>{m.semestre || "—"}</td>
-                    <td><ExamTypeBadge value={m.exam_type} /></td>
+                    <td><ExamTypeBadge value={m.type_formation} /></td>
                     <td>
                       {m.seance_efm === "Oui"
                         ? <span className="badge badge-red" style={{ fontSize: 10 }}>EFM</span>

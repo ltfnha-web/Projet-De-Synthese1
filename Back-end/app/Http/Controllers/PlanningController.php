@@ -85,23 +85,32 @@ class PlanningController extends Controller
             $totalPrevu   = $p->semaines->sum('mh_prevue');
             $mhRestante   = max(0, ($p->mh_drif ?? 0) - $totalPrevu);
 
+            // MH réellement réalisée provenant du module (données réelles)
+            $mhRealiseeModule = (float)($p->module?->mh_realisee_globale ?? 0);
+
+            // AVC réel = MH réalisée du module / MH DRIF
+            $mhDrif = (float)($p->mh_drif ?? 0);
+            $avcReel = $mhDrif > 0 ? round(($mhRealiseeModule / $mhDrif) * 100, 1) : 0;
+
             return [
-                'id'           => $p->id,
-                'groupe_id'    => $p->groupe_id,
-                'groupe_nom'   => $p->groupe?->nom ?? $p->groupe?->code ?? '—',
-                'module_id'    => $p->module_id,
-                'module_nom'   => $p->module?->intitule ?? '—',
-                'formateur_id' => $p->formateur_id,
-                'formateur_nom'=> $p->formateur?->nom ?? '—',
-                'semestre'     => $p->semestre,
-                'mh_drif'      => $p->mh_drif ?? 0,
-                'mh_realisee'  => $p->mh_realisee ?? 0,
-                'mh_restante'  => $mhRestante,
-                'total_prevu'  => $totalPrevu,
-                'type'         => $p->type ?? 'Régionale',   // ✅ FIX : champ type inclus
-                'mode'         => $p->mode ?? 'PRESENTIEL',
-                'charge_hebdo' => $p->charge_hebdo ?? 0,
-                'semaines'     => $mhBySemaine,
+                'id'                 => $p->id,
+                'groupe_id'          => $p->groupe_id,
+                'groupe_nom'         => $p->groupe?->nom ?? $p->groupe?->code ?? '—',
+                'module_id'          => $p->module_id,
+                'module_nom'         => $p->module?->intitule ?? '—',
+                'formateur_id'       => $p->formateur_id,
+                'formateur_nom'      => $p->formateur?->nom ?? '—',
+                'semestre'           => $p->semestre,
+                'mh_drif'            => $mhDrif,
+                'mh_realisee'        => $p->mh_realisee ?? 0,
+                'mh_realisee_module' => $mhRealiseeModule, // Valeur réelle depuis le module
+                'avc_reel'           => $avcReel,          // AVC = mh_realisee_module / mh_drif
+                'mh_restante'        => $mhRestante,
+                'total_prevu'        => $totalPrevu,
+                'type'               => $p->type ?? 'Régionale',
+                'mode'               => $p->mode ?? 'PRESENTIEL',
+                'charge_hebdo'       => $p->charge_hebdo ?? 0,
+                'semaines'           => $mhBySemaine,
             ];
         });
 

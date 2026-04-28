@@ -60,9 +60,6 @@ export default function EspaceStagiaire() {
       {/* Navbar */}
       <nav className="navbar">
         <Link to="/home" className="brand">
-          <div className="brand-logo">
-            <img src="/logoOfppt.png" alt="OFPPT" />
-          </div>
           <div className="brand-info">
             <span className="brand-name">OFPPT</span>
             <span className="brand-sub">Espace Stagiaire</span>
@@ -212,9 +209,6 @@ export default function EspaceStagiaire() {
       {/* Footer */}
       <footer className="stg-footer">
         <div className="footer-brand">
-          <div className="brand-logo small">
-            <img src="/logoOfppt.png" alt="OFPPT" />
-          </div>
           <span>OFPPT © {new Date().getFullYear()} — Tous droits réservés</span>
         </div>
         <div className="footer-links">

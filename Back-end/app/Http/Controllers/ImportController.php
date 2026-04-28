@@ -65,15 +65,31 @@ class ImportController extends Controller
             return response()->json(['message' => 'Le fichier est vide.'], 422);
         }
 
-        // Supprimer les anciens headers (ligne 1)
-        array_shift($rows);
+        $totalRows = count($rows);
 
-        // ── Vider les tables avant import (fresh import) ──
-        Module::query()->delete();
-        Groupe::query()->delete();
-        Filiere::query()->delete();
-        Formateur::query()->delete();
-        Secteur::query()->delete();
+        // Auto-détection du début des données : chercher la 1ère ligne
+        // où secteur[3], groupe[8] ET code module[16] sont tous non vides.
+        // Cela gère les fichiers avec 1, 2 ou 3 lignes d'en-tête.
+        $dataStart = null;
+        foreach ($rows as $i => $r) {
+            $s = trim((string)($r[3]  ?? ''));
+            $g = trim((string)($r[8]  ?? ''));
+            $m = trim((string)($r[16] ?? ''));
+            if (!empty($s) && !empty($g) && !empty($m)) {
+                $dataStart = $i;
+                break;
+            }
+        }
+
+        if ($dataStart === null) {
+            $firstRow = array_slice(array_map('strval', $rows[0] ?? []), 0, 25);
+            return response()->json([
+                'message' => "Aucune donnée trouvée. Le fichier contient {$totalRows} lignes mais aucune avec secteur + groupe + code module remplis simultanément. Vérifiez que les colonnes D(secteur), I(groupe) et Q(code module) existent.",
+                'debug'   => ['total_rows' => $totalRows, 'first_row_preview' => $firstRow],
+            ], 422);
+        }
+
+        $rows = array_slice($rows, $dataStart);
 
         // ── Caches pour éviter les doublons ──
         $secteurCache  = [];
@@ -203,31 +219,32 @@ class ImportController extends Controller
 
             $n = fn(int $i) => is_numeric($row[$i] ?? '') ? (float)$row[$i] : 0;
 
-            Module::create([
-                'code'                   => $codeModule,
-                'intitule'               => $nomModule,
-                'groupe_id'              => $groupeId,
-                'formateur_id'           => $formateurId,
-                // MH DRIF
-                'mh_drif'                => $n(51),
-                'mh_drif_presentiel'     => $n(52),
-                'mh_drif_distanciel'     => $n(53),
-                // MH Réalisée
-                'mh_realisee_presentiel' => $n(38),
-                'mh_realisee_sync'       => $n(39),
-                'mh_realisee_globale'    => $n(40),
-                // MH Restante
-                'mh_restante'            => $n(62),
-                // Taux
-                'taux_realisation'       => $n(43),
-                'tx_avc_mod'             => $n(55),
-                // Infos
-                'eg_et'                  => $v(48),
-                'semestre'               => $v(50),
-                'validation_efm'         => $v(47),
-                'seance_efm'             => $v(46),
-            ]);
-            $stats['modules']++;
+            // Upsert : mettre à jour si existe déjà (même code + même groupe), sinon créer
+            $module = Module::updateOrCreate(
+                [
+                    'code'      => $codeModule,
+                    'groupe_id' => $groupeId,
+                ],
+                [
+                    'intitule'               => $nomModule,
+                    'formateur_id'           => $formateurId,
+                    'type_formation'         => $v(6),
+                    'mh_drif'                => $n(51),
+                    'mh_drif_presentiel'     => $n(52),
+                    'mh_drif_distanciel'     => $n(53),
+                    'mh_realisee_presentiel' => $n(38),
+                    'mh_realisee_sync'       => $n(39),
+                    'mh_realisee_globale'    => $n(40),
+                    'mh_restante'            => $n(62),
+                    'taux_realisation'       => $n(43),
+                    'tx_avc_mod'             => $n(55),
+                    'eg_et'                  => $v(48),
+                    'semestre'               => $v(50),
+                    'validation_efm'         => $v(47),
+                    'seance_efm'             => $v(46),
+                ]
+            );
+            if ($module->wasRecentlyCreated) $stats['modules']++;
         }
 
         return response()->json([
@@ -239,7 +256,12 @@ class ImportController extends Controller
                 'groupes'    => $stats['groupes'],
                 'modules'    => $stats['modules'],
             ],
-            'erreurs' => array_slice($stats['erreurs'], 0, 50), // max 50 erreurs affichées
+            'debug' => [
+                'total_rows_in_file'  => $totalRows,
+                'header_rows_skipped' => $dataStart,
+                'data_rows_processed' => count($rows),
+            ],
+            'erreurs' => array_slice($stats['erreurs'], 0, 50),
         ]);
     }
 }

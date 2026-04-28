@@ -70,13 +70,6 @@ export default function PoleLayout() {
 
         {/* ── Brand ── */}
         <div className="al-brand">
-          <div className="al-brand-logo">
-            <img
-              src="/logoOfppt.png"
-              alt="OFPPT"
-              onError={e => { e.target.style.display = "none"; }}
-            />
-          </div>
           <div className="al-brand-info">
             <span className="al-brand-name">ISTA Hay Salam</span>
             <span className="al-brand-sub">Espace Pôle</span>

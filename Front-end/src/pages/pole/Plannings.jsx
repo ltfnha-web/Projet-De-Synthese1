@@ -50,20 +50,60 @@ function SemBadge({ s }) {
   return <span className={`badge ${s === "S1" ? "badge-info" : "badge-purple"}`}>{s}</span>;
 }
 
-function AvcBar({ mhDrif, totalPrevu }) {
+// AVC réel = MH réalisée (données module) / MH DRIF
+function AvcBar({ mhDrif, totalPrevu, mhRealiseeModule, avcReel }) {
   if (!mhDrif) return <span style={{ color: "var(--sl4)", fontSize: 11 }}>—</span>;
-  const pct   = Math.min(100, (totalPrevu / mhDrif) * 100);
-  const color = pct >= 90 ? "#7c3aed" : pct >= 60 ? "var(--em5)" : pct >= 30 ? "var(--am5)" : "var(--rd5)";
+
+  // AVC réel = mh_realisee_module / mh_drif (si disponible, sinon fallback sur totalPrevu)
+  const pctReel   = avcReel !== undefined ? Math.min(120, avcReel) : Math.min(100, (totalPrevu / mhDrif) * 100);
+  const pctPlanif = Math.min(100, (totalPrevu / mhDrif) * 100); // Taux de planification
+
+  const colorReel   = pctReel >= 90 ? "#7c3aed" : pctReel >= 60 ? "var(--em5)" : pctReel >= 30 ? "var(--am5)" : "var(--rd5)";
+  const colorPlanif = "#94a3b8"; // Gris pour la planification
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 90 }}>
-      <div style={{ flex: 1, height: 4, background: "var(--sl2)", borderRadius: 2, overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2, transition: "width .3s" }} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 100 }}>
+      {/* Barre AVC réel */}
+      <div title={`AVC réel : ${pctReel.toFixed(1)}% (MH réalisée / MH DRIF)`}
+           style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <div style={{ flex: 1, height: 4, background: "var(--sl2)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ width: `${Math.min(100, pctReel)}%`, height: "100%", background: colorReel, borderRadius: 2, transition: "width .3s" }} />
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 700, color: colorReel, minWidth: 34, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+          {pctReel.toFixed(0)}%
+        </span>
       </div>
-      <span style={{ fontSize: 10, fontWeight: 700, color, minWidth: 32, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-        {pct.toFixed(0)}%
-      </span>
+      {/* Barre planification (grise) */}
+      <div title={`Planifié : ${pctPlanif.toFixed(1)}% des MH distribués dans le planning`}
+           style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <div style={{ flex: 1, height: 3, background: "var(--sl2)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ width: `${pctPlanif}%`, height: "100%", background: colorPlanif, borderRadius: 2 }} />
+        </div>
+        <span style={{ fontSize: 9, color: colorPlanif, minWidth: 34, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+          {pctPlanif.toFixed(0)}%
+        </span>
+      </div>
     </div>
   );
+}
+
+// Calcule la charge recommandée = masse restante / semaines restantes dans le semestre
+function calcChargeRecommandee(mhRestante, semestre) {
+  if (!mhRestante || mhRestante <= 0) return null;
+  const now = new Date();
+  const annee = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+
+  // S1 : septembre → fin janvier (sem 1–22), S2 : février → juin (sem 23–44 environ)
+  // On estime grossièrement : S1 finit fin janvier, S2 finit fin juin
+  let finSemestre;
+  if (semestre === "S1") {
+    finSemestre = new Date(annee + 1, 1, 1); // 1er février
+  } else {
+    finSemestre = new Date(annee + 1, 6, 1); // 1er juillet
+  }
+  const msRestants = finSemestre - now;
+  const semainesRestantes = Math.max(1, Math.floor(msRestants / (7 * 24 * 3600 * 1000)));
+  return (mhRestante / semainesRestantes).toFixed(1);
 }
 
 function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cellSemestre, isStage }) {
@@ -220,7 +260,23 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
         </span>
       </td>
       <td style={{ padding: "0 10px", borderRight: "2px solid var(--border)" }}>
-        <AvcBar mhDrif={p.mh_drif} totalPrevu={p.total_prevu} />
+        {/* AVC réel (MH réalisée / MH DRIF) + taux de planification */}
+        <AvcBar
+          mhDrif={p.mh_drif}
+          totalPrevu={p.total_prevu}
+          mhRealiseeModule={p.mh_realisee_module}
+          avcReel={p.avc_reel}
+        />
+        {/* Charge recommandée pour rattraper le retard */}
+        {(() => {
+          const charge = calcChargeRecommandee(p.mh_restante, p.semestre);
+          return charge ? (
+            <div title="Masse restante / Semaines restantes dans ce semestre"
+                 style={{ fontSize: 9, color: "var(--am6)", marginTop: 2, fontWeight: 600 }}>
+              Rec: {charge}h/sem
+            </div>
+          ) : null;
+        })()}
       </td>
       <td style={{ textAlign: "center", padding: "4px 6px" }}>
         {editing ? (

@@ -18,20 +18,16 @@ return [
     // Méthodes HTTP autorisées
     'allowed_methods' => ['*'],
 
-    // Origines autorisées (adresse du frontend React)
     'allowed_origins' => [
-        'http://localhost:5173',   // Vite dev server (React)
-        'http://localhost:3000',   // Create React App
-        'http://127.0.0.1:5173',   // Alias localhost
+        'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
     ],
 
-    // Allows any ngrok tunnel URL (free & paid plans)
-    'allowed_origins_patterns' => [
-        '#^https://[a-z0-9\-]+\.ngrok-free\.app$#',
-        '#^https://[a-z0-9\-]+\.ngrok\.io$#',
-        '#^https://[a-z0-9\-]+\.ngrok\.app$#',
-    ],
+    'allowed_origins_patterns' => [],
 
     // En-têtes autorisés dans les requêtes
     'allowed_headers' => ['*'],

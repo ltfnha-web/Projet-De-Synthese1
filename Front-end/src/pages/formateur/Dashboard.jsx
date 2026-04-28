@@ -23,6 +23,7 @@ function countSeances(grille) {
   if (!grille) return 0;
   return JOURS.reduce((n, j) => n + (grille[j] ?? []).filter(Boolean).length, 0);
 }
+
 function distinctGroupes(grille) {
   if (!grille) return [];
   const s = new Set();
@@ -33,7 +34,7 @@ function todayFR() {
   return new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
-/* ─── icons ─────────────────────────────────────────────────────────── */
+/* ─── icons ─────────────────────────────────────────────────────────── */ 
 const Ico = {
   logout:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   calendar: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
@@ -309,9 +310,6 @@ export default function FormateurDashboard() {
         padding: "0 28px", gap: 16, boxShadow: "0 1px 4px rgba(0,0,0,.06)",
       }}>
         <div className="fmd-nav-brand" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-          <div style={{ height: 46, display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <img src="/logoOfppt.png" alt="OFPPT" style={{ height: "100%", width: "auto", objectFit: "contain", display: "block" }} onError={e => { e.target.style.display = "none"; }} />
-          </div>
           <div className="fmd-nav-brand-text">
             <div style={{ fontWeight: 700, fontSize: 13, color: "#111", lineHeight: 1 }}>Espace Formateur</div>
             <div style={{ fontSize: 10, color: "#71717a", marginTop: 1 }}>ISTA Hay Salam · CF SALE I</div>

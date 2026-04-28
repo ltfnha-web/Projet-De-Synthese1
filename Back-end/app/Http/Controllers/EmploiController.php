@@ -53,12 +53,21 @@ class EmploiController extends Controller
 
         $seances = $this->parseGrille($request->grille, $request->semestre);
 
-        // Pre-flight conflict check (application layer)
+        // Vérifier conflits de salles
         $conflicts = $this->conflictService->checkConflicts($seances);
         if (!empty($conflicts)) {
             return response()->json([
                 'message'   => 'Conflits de salles détectés.',
                 'conflicts' => array_column($conflicts, 'message'),
+            ], 422);
+        }
+
+        // Vérifier conflits de formateurs (même formateur, même jour, même séance)
+        $formateurConflicts = $this->checkFormateurConflicts($request->grille, $request->groupe_id);
+        if (!empty($formateurConflicts)) {
+            return response()->json([
+                'message'   => 'Conflit de formateur détecté : un formateur ne peut pas avoir deux séances au même moment.',
+                'conflicts' => $formateurConflicts,
             ], 422);
         }
 
@@ -210,6 +219,15 @@ class EmploiController extends Controller
                 ], 422);
             }
 
+            // Vérifier conflits de formateurs lors de la mise à jour
+            $formateurConflicts = $this->checkFormateurConflicts($request->grille, $emploi->groupe_id, $emploi->id);
+            if (!empty($formateurConflicts)) {
+                return response()->json([
+                    'message'   => 'Conflit de formateur détecté.',
+                    'conflicts' => $formateurConflicts,
+                ], 422);
+            }
+
             try {
                 DB::transaction(function () use ($emploi, $request, $seances, $semestre) {
                     $emploi->seances()->delete();
@@ -284,6 +302,58 @@ class EmploiController extends Controller
                 'grille'    => $grille,
             ],
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRIVATE: Vérifie qu'aucun formateur n'a deux séances au même moment
+    // Exception : mode DISTANCIEL est toujours autorisé (cours en ligne)
+    // ─────────────────────────────────────────────────────────────────────────
+    private function checkFormateurConflicts(array $newGrille, int $groupeId, ?int $excludeEmploiId = null): array
+    {
+        $conflicts = [];
+
+        // Récupérer tous les emplois existants (sauf celui qu'on modifie)
+        $autresEmplois = EmploiDuTemps::where('groupe_id', '!=', $groupeId)
+            ->when($excludeEmploiId, fn($q) => $q->where('id', '!=', $excludeEmploiId))
+            ->get();
+
+        // Construire un index : formateur_id → [(jour, seance, mode, groupe)]
+        $existants = [];
+        foreach ($autresEmplois as $emploi) {
+            if (!is_array($emploi->grille)) continue;
+            foreach (self::JOURS as $jour) {
+                foreach (($emploi->grille[$jour] ?? []) as $si => $cell) {
+                    if (empty($cell) || empty($cell['formateur_id'])) continue;
+                    $fid  = (int)$cell['formateur_id'];
+                    $mode = $cell['mode'] ?? 'PRESENTIEL';
+                    // Ignorer les séances à distance (pas de contrainte horaire physique)
+                    if ($mode === 'DISTANCIEL') continue;
+                    $existants[$fid][] = ['jour' => $jour, 'seance' => (int)$si];
+                }
+            }
+        }
+
+        // Vérifier chaque cellule de la nouvelle grille
+        foreach (self::JOURS as $jour) {
+            foreach (($newGrille[$jour] ?? []) as $si => $cell) {
+                if (empty($cell) || empty($cell['formateur_id'])) continue;
+                $fid  = (int)$cell['formateur_id'];
+                $mode = $cell['mode'] ?? 'PRESENTIEL';
+                // Les séances à distance ne génèrent pas de conflit
+                if ($mode === 'DISTANCIEL') continue;
+
+                if (!isset($existants[$fid])) continue;
+
+                foreach ($existants[$fid] as $slot) {
+                    if ($slot['jour'] === $jour && $slot['seance'] === (int)$si) {
+                        $nom = $cell['formateur'] ?? "Formateur #{$fid}";
+                        $conflicts[] = "Le formateur {$nom} a déjà une séance le {$jour} séance " . ((int)$si + 1) . ".";
+                    }
+                }
+            }
+        }
+
+        return $conflicts;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -1,13 +1,6 @@
 import { Link } from "react-router-dom";
 import "../styles/Home.css";
 
-const STATS = [
-  { num: "350+", label: "Établissements" },
-  { num: "92k", label: "Stagiaires" },
-  { num: "8k+", label: "Formateurs" },
-  { num: "120+", label: "Filières" },
-];
-
 const SERVICES = [
   {
     icon: (
@@ -52,12 +45,9 @@ const SERVICES = [
 export default function Home() {
   return (
     <div className="home-page">
-      {/* Navbar */}
+      {/* ── Navbar ── */}
       <nav className="navbar">
         <div className="brand">
-          <div className="brand-logo">
-            <img src="/logoOfppt.png" alt="logo OFPPT" />
-          </div>
           <div className="brand-info">
             <span className="brand-name">OFPPT</span>
             <span className="brand-sub">Gestion Pédagogique</span>
@@ -76,13 +66,9 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* ── Hero Section ── */}
       <section className="hero-section">
         <div className="hero-content">
-          <div className="hero-badge">
-            <div className="badge-dot"></div>
-            Plateforme officielle OFPPT
-          </div>
           <h1 className="hero-title">
             Plateforme de<br />
             <span>Gestion Pédagogique</span>
@@ -91,7 +77,7 @@ export default function Home() {
             Organisez vos cours, vos stagiaires et vos ressources dans une seule plateforme unifiée, sécurisée et accessible partout.
           </p>
           <div className="hero-actions">
-            <Link to="/stagiaire/espace" className="btn" >
+            <Link to="/stagiaire/espace" className="btn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
@@ -108,22 +94,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="hero-stats">
-          {STATS.map((s, i) => (
-            <div className="stat-card" key={i}>
-              <div className="stat-num">{s.num}</div>
-              <div className="stat-label">{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Decorative shapes */}
+        {/* Formes décoratives */}
         <div className="hero-decor decor-1"></div>
         <div className="hero-decor decor-2"></div>
       </section>
 
-      {/* Services Section */}
+      {/* ── Services Section ── */}
       <section className="services-section" id="services">
         <div className="section-header">
           <span className="section-tag">Nos espaces</span>
@@ -147,12 +123,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer className="home-footer">
         <div className="footer-brand">
-          <div className="brand-logo small">
-            <img src="/logoOfppt.png" alt="OFPPT" />
-          </div>
           <span>OFPPT © {new Date().getFullYear()} — Tous droits réservés</span>
         </div>
         <div className="footer-links">

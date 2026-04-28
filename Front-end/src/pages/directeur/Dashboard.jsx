@@ -109,28 +109,31 @@ export default function DirecteurDashboard() {
   const [loading, setLoading] = useState(true);
 
   // ── Filtres (envoyés au backend) ──
-  const [fSecteur, setFSecteur] = useState("");
-  const [fCreneau, setFCreneau] = useState("");
-  const [fAnnee,   setFAnnee]   = useState("");
-  const [fSeuil,   setFSeuil]   = useState("");
-  const [fGroupe,  setFGroupe]  = useState("");
-  const [fModule,  setFModule]  = useState("");
+  const [fSecteur,  setFSecteur]  = useState("");
+  const [fCreneau,  setFCreneau]  = useState("");
+  const [fAnnee,    setFAnnee]    = useState("");
+  const [fSeuil,    setFSeuil]    = useState("");
+  const [fGroupe,   setFGroupe]   = useState("");
+  const [fModule,   setFModule]   = useState("");
+  const [fExamType, setFExamType] = useState(""); // Filtre par type d'examen
 
   // ── Fetch avec params ──
   const fetchStats = useCallback(() => {
     setLoading(true);
     const params = {};
-    if (fSecteur) params.secteur_id = fSecteur;
-    if (fCreneau) params.creneau    = fCreneau;
-    if (fAnnee)   params.annee      = fAnnee;
-    if (fSeuil)   params.seuil      = fSeuil;
-    if (fGroupe)  params.groupe_id  = fGroupe;
+    if (fSecteur)  params.secteur_id = fSecteur;
+    if (fCreneau)  params.creneau    = fCreneau;
+    if (fAnnee)    params.annee      = fAnnee;
+    if (fSeuil)    params.seuil      = fSeuil;
+    if (fGroupe)   params.groupe_id  = fGroupe;
+    if (fModule)   params.module_id  = fModule;
+    if (fExamType) params.exam_type  = fExamType;
 
     axios.get("/stats", { params })
       .then(r => setStats(r.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [fSecteur, fCreneau, fAnnee, fSeuil]);
+  }, [fSecteur, fCreneau, fAnnee, fSeuil, fGroupe, fModule, fExamType]);
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
@@ -186,8 +189,20 @@ export default function DirecteurDashboard() {
   const handleSecteurChange = (v) => { setFSecteur(v); setFGroupe(""); setFModule(""); };
   const handleGroupeChange  = (v) => { setFGroupe(v);  setFModule(""); };
 
-  const hasFilters = fSecteur || fCreneau || fAnnee || fSeuil || fGroupe || fModule;
-  const resetAll   = () => { setFSecteur(""); setFCreneau(""); setFAnnee(""); setFSeuil(""); setFGroupe(""); setFModule(""); };
+  const EXAM_LABELS = {
+    EFF: "Fin de Formation (EFF)", "Fin de Formation": "Fin de Formation",
+    "Fin Formation": "Fin de Formation",
+    EFP: "Passage (EFP)", Passage: "Passage",
+    Qualifiante: "Qualifiante", Diplômante: "Diplômante",
+    EFM: "EFM", "1A": "1ère Année", "2A": "2ème Année", Aucun: "Aucun",
+  };
+  const examTypeOpts = [
+    { value: "", label: "Tous types d'examen" },
+    ...(stats?.exam_types_list || []).map(t => ({ value: t, label: EXAM_LABELS[t] || t })),
+  ];
+
+  const hasFilters = fSecteur || fCreneau || fAnnee || fSeuil || fGroupe || fModule || fExamType;
+  const resetAll   = () => { setFSecteur(""); setFCreneau(""); setFAnnee(""); setFSeuil(""); setFGroupe(""); setFModule(""); setFExamType(""); };
 
   // ── KPI Cards ──
   const avcAccent = avcColor(avcPct);
@@ -372,10 +387,11 @@ export default function DirecteurDashboard() {
       ══════════════════════════════════════ */}
       <Card style={{ marginBottom: 18, padding: "14px 18px" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <FilterSelect label="Secteur"         value={fSecteur} onChange={handleSecteurChange} options={secteurOpts} />
-          <FilterSelect label="Créneau"         value={fCreneau} onChange={setFCreneau} options={creneauOpts} />
-          <FilterSelect label="Année"           value={fAnnee}   onChange={setFAnnee}   options={anneeOpts}   />
-          <FilterSelect label="Niveau AVC"      value={fSeuil}   onChange={setFSeuil}   options={seuilOpts}   />
+          <FilterSelect label="Secteur"         value={fSecteur}  onChange={handleSecteurChange} options={secteurOpts}  />
+          <FilterSelect label="Créneau"         value={fCreneau}  onChange={setFCreneau}          options={creneauOpts}  />
+          <FilterSelect label="Année"           value={fAnnee}    onChange={setFAnnee}            options={anneeOpts}    />
+          <FilterSelect label="Niveau AVC"      value={fSeuil}    onChange={setFSeuil}            options={seuilOpts}    />
+          <FilterSelect label="Type d'examen"   value={fExamType} onChange={setFExamType}         options={examTypeOpts} />
 
           {/* Groupe — apparaît seulement si secteur sélectionné */}
           {fSecteur && (stats?.groupes_list?.length > 0) && (
@@ -425,10 +441,13 @@ export default function DirecteurDashboard() {
         {hasFilters && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
             <span style={{ fontSize: 11, color: C.slate, alignSelf: "center" }}>Filtres actifs :</span>
-            {fSecteur && <Chip label={secteurOpts.find(o => o.value == fSecteur)?.label || fSecteur} onRemove={() => setFSecteur("")} />}
-            {fCreneau && <Chip label={fCreneau === "CDJ" ? "Cours du Jour" : "Cours du Soir"}         onRemove={() => setFCreneau("")} />}
-            {fAnnee   && <Chip label={`${fAnnee}ère année`}                                            onRemove={() => setFAnnee("")}   />}
-            {fSeuil   && <Chip label={fSeuil === "critique" ? "Critiques < 30%" : "À risque < 50%"}    onRemove={() => setFSeuil("")}   />}
+            {fSecteur   && <Chip label={secteurOpts.find(o => o.value == fSecteur)?.label || fSecteur}  onRemove={() => { setFSecteur(""); setFGroupe(""); setFModule(""); }} />}
+            {fCreneau   && <Chip label={fCreneau === "CDJ" ? "Cours du Jour" : "Cours du Soir"}          onRemove={() => setFCreneau("")}   />}
+            {fAnnee     && <Chip label={`${fAnnee}ère année`}                                             onRemove={() => setFAnnee("")}     />}
+            {fSeuil     && <Chip label={fSeuil === "critique" ? "Critiques < 30%" : "À risque < 50%"}    onRemove={() => setFSeuil("")}     />}
+            {fExamType  && <Chip label={`Type : ${fExamType}`}                                            onRemove={() => setFExamType("")}  />}
+            {fGroupe    && <Chip label={`Groupe : ${(stats?.groupes_list || []).find(g => String(g.id) === String(fGroupe))?.nom || fGroupe}`} onRemove={() => { setFGroupe(""); setFModule(""); }} />}
+            {fModule    && <Chip label={`Module : ${(stats?.modules_list || []).find(m => String(m.id) === String(fModule))?.code || fModule}`} onRemove={() => setFModule("")} />}
           </div>
         )}
       </Card>

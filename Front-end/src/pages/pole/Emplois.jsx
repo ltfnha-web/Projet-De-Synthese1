@@ -966,6 +966,194 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   MODAL MODIFIER UN EMPLOI EXISTANT
+   Charge la grille existante et permet de la modifier
+═══════════════════════════════════════════════════════════════ */
+function ModalModifierEmploi({ emploi, onClose, onSaved, groupes, plannings = [] }) {
+  // Initialiser la grille depuis l'emploi existant (jours = grille JSON)
+  const [grille, setGrille] = useState(() => {
+    const base = {};
+    JOURS.forEach(j => { base[j] = [null, null, null, null]; });
+    if (emploi?.jours) {
+      JOURS.forEach(j => { if (Array.isArray(emploi.jours[j])) base[j] = [...emploi.jours[j]]; });
+    }
+    return base;
+  });
+
+  const [modules, setModules]       = useState([]);
+  const [formateurs, setFormateurs] = useState([]);
+  const [availableSalles, setAvail] = useState({});
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState(null);
+
+  useEffect(() => {
+    axios.get("/pole-formateurs").then(({ data }) => setFormateurs(data.data ?? data ?? [])).catch(() => {});
+    if (emploi?.groupe_id) {
+      axios.get(`/pole-modules?groupe_id=${emploi.groupe_id}`).then(({ data }) => setModules(data.data ?? data ?? [])).catch(() => {});
+    }
+  }, [emploi]);
+
+  const fetchAvailableSalles = async (jour) => {
+    if (availableSalles[jour]) return;
+    try {
+      const { data } = await axios.get(`/salles/disponibles?jour=${encodeURIComponent(jour)}&semestre=${emploi.semestre}`);
+      setAvail(prev => ({ ...prev, [jour]: data.data ?? [] }));
+    } catch { setAvail(prev => ({ ...prev, [jour]: [] })); }
+  };
+
+  const setCell = (jour, si, field, value) => {
+    setGrille(prev => {
+      const next = { ...prev };
+      const row = [...(next[jour] || [null, null, null, null])];
+      if (!row[si]) row[si] = { module: "", formateur: "", salle: "", mode: "PRESENTIEL" };
+      else row[si] = { ...row[si] };
+      row[si][field] = value;
+      if (field === "module") {
+        if (value) {
+          const mod = modules.find(m => toStr(m.intitule ?? m.code) === value);
+          if (mod?.formateur_id) {
+            const fmt = formateurs.find(f => String(f.id) === String(mod.formateur_id));
+            row[si].formateur = fmt ? toStr(fmt.nom) : "";
+            row[si].formateur_id = mod.formateur_id;
+          } else { row[si].formateur = ""; row[si].formateur_id = null; }
+          row[si].module_id = mod?.id ?? null;
+        } else { row[si] = null; }
+      }
+      if (field === "salle_id") {
+        const found = (availableSalles[jour] ?? []).find(s => String(s.id) === String(value));
+        row[si].salle = found ? found.nom : "";
+        row[si].salle_id = found ? found.id : null;
+      }
+      next[jour] = row;
+      return next;
+    });
+  };
+
+  const clearCell = (jour, si) => setGrille(prev => {
+    const next = { ...prev }; const row = [...(next[jour] || [])]; row[si] = null; next[jour] = row; return next;
+  });
+
+  const addCell = (jour, si) => {
+    fetchAvailableSalles(jour);
+    setGrille(prev => {
+      const next = { ...prev };
+      const row = [...(next[jour] || [null, null, null, null])];
+      row[si] = { module: "", formateur: "", salle: "", salle_id: null, mode: "PRESENTIEL" };
+      next[jour] = row; return next;
+    });
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true); setError(null);
+    try {
+      await axios.put(`/emplois/${emploi.id}`, { grille, semestre: emploi.semestre });
+      onSaved();
+    } catch (e) {
+      setError(e.response?.data?.message
+        || (e.response?.data?.conflicts ? e.response.data.conflicts.join(" | ") : null)
+        || "Erreur inconnue");
+    } finally { setSaving(false); }
+  };
+
+  const inpSt = { width: "100%", padding: "5px 8px", border: "1px solid var(--sp-border)", borderRadius: 6, fontSize: 11, background: "var(--sp-gray-100)", color: "var(--sp-black)", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "flex-start", paddingTop: 24, paddingBottom: 24, overflowY: "auto" }}>
+      <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto", padding: "0 12px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", overflow: "hidden", border: "1px solid var(--sp-border)" }}>
+
+        <div style={{ background: "var(--sp-black)", padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>Modifier l'emploi du temps — {toStr(emploi.groupe)}</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: 11, marginTop: 2 }}>{emploi.semestre} · Modifiez les séances puis enregistrez</div>
+          </div>
+          <button className="sp-btn sp-btn--secondary" onClick={onClose} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>{Ico.close}</button>
+        </div>
+
+        <div style={{ padding: "20px 22px" }}>
+          {error && <div style={{ padding: "10px 14px", background: "#fee2e2", color: "#dc2626", borderRadius: 6, marginBottom: 14, fontSize: 12 }}>{error}</div>}
+
+          {/* Grille horaire */}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "var(--sp-black)" }}>
+                  <th style={{ color: "#fff", padding: "10px 12px", border: "1px solid #333", width: 80, fontSize: 11 }}>Jour</th>
+                  {SEANCES.map((s, i) => (
+                    <th key={i} style={{ color: "#fff", padding: "8px 12px", textAlign: "center", border: "1px solid #333" }}>
+                      <div style={{ fontWeight: 600 }}>{s.label}</div>
+                      <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.6 }}>{s.horaire}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {JOURS.map((jour, ji) => (
+                  <tr key={jour} style={{ background: ji % 2 === 0 ? "#fff" : "var(--sp-gray-100)" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: 12, border: "1px solid var(--sp-border)" }}>{jour}</td>
+                    {[0, 1, 2, 3].map(si => {
+                      const cell = (grille[jour] ?? [])[si];
+                      const list = availableSalles[jour];
+                      return (
+                        <td key={si} style={{ padding: "6px 8px", verticalAlign: "top", border: "1px solid var(--sp-border)", minWidth: 160 }}>
+                          {cell ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {/* Module */}
+                              <select style={{ ...inpSt, fontSize: 10 }} value={toStr(cell.module)} onChange={e => setCell(jour, si, "module", e.target.value)}>
+                                <option value="">Module…</option>
+                                {modules.map(m => <option key={m.id} value={toStr(m.intitule ?? m.code)}>{toStr(m.code)} — {toStr(m.intitule)}</option>)}
+                              </select>
+                              {/* Formateur */}
+                              <select style={{ ...inpSt, fontSize: 10 }} value={toStr(cell.formateur)} onChange={e => setCell(jour, si, "formateur", e.target.value)}>
+                                <option value="">Formateur…</option>
+                                {formateurs.map(f => <option key={f.id} value={toStr(f.nom)}>{toStr(f.nom)}</option>)}
+                              </select>
+                              {/* Mode */}
+                              <select style={{ ...inpSt, fontSize: 10 }} value={cell.mode ?? "PRESENTIEL"} onChange={e => setCell(jour, si, "mode", e.target.value)}>
+                                <option value="PRESENTIEL">Présentiel</option>
+                                <option value="DISTANCIEL">À distance</option>
+                              </select>
+                              {/* Salle */}
+                              {cell.mode !== "DISTANCIEL" && (
+                                list === undefined ? (
+                                  <input type="text" style={{ ...inpSt, fontSize: 10 }} placeholder="Salle…" value={cell.salle} onClick={() => fetchAvailableSalles(jour)} onChange={e => setCell(jour, si, "salle", e.target.value)} />
+                                ) : (
+                                  <select style={{ ...inpSt, fontSize: 10 }} value={cell.salle_id ?? ""} onChange={e => setCell(jour, si, "salle_id", e.target.value)}>
+                                    <option value="">Salle…</option>
+                                    {(list ?? []).map(s => <option key={s.id} value={s.id}>{s.nom}{s.capacite ? ` (${s.capacite})` : ""}</option>)}
+                                  </select>
+                                )
+                              )}
+                              <button type="button" onClick={() => clearCell(jour, si)} style={{ fontSize: 10, padding: "2px 6px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 4, cursor: "pointer" }}>
+                                Supprimer
+                              </button>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => addCell(jour, si)}
+                              style={{ width: "100%", padding: "18px 8px", background: "transparent", border: "2px dashed var(--sp-border)", borderRadius: 6, cursor: "pointer", color: "var(--sp-gray-400)", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center" }}
+                            >+</button>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 14, borderTop: "1px solid var(--sp-border)", marginTop: 14 }}>
+            <button className="sp-btn sp-btn--secondary" type="button" onClick={onClose}>Annuler</button>
+            <button className="sp-btn sp-btn--primary" type="button" onClick={handleSubmit} disabled={saving}>
+              {saving ? "Enregistrement…" : <>{Ico.check} Enregistrer les modifications</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    PAGE PRINCIPALE
 ═══════════════════════════════════════════════════════════════ */
 export default function Emplois() {
@@ -980,6 +1168,9 @@ export default function Emplois() {
   const [alert, setAlert]                   = useState(null);
   const [formateurEmplois, setFmtEmplois]   = useState([]);
   const [viewingFmtEmploi, setViewingFmt]   = useState(null);
+  // Emploi à modifier (bouton Modifier emploi)
+  const [emploiAModifier, setEmploiAModifier] = useState(null);
+  const [generatingAll, setGeneratingAll]     = useState(false);
 
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 4000); };
 
@@ -1006,6 +1197,27 @@ export default function Emplois() {
       setEmploiActif(data.data ?? data);
       setTimeout(() => document.getElementById("emploi-doc")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch { flash("Erreur de chargement.", "err"); }
+  };
+
+  // Charger un emploi pour le modifier
+  const ouvrirModification = async (id) => {
+    try {
+      const { data } = await axios.get(`/emplois/${id}`);
+      setEmploiAModifier(data.data ?? data);
+    } catch { flash("Erreur de chargement de l'emploi.", "err"); }
+  };
+
+  // Générer tous les emplois de formateurs depuis les emplois du temps existants
+  const genererTousEmploisFormateurs = async () => {
+    if (!window.confirm("Générer les emplois de tous les formateurs depuis les emplois du temps existants ?")) return;
+    setGeneratingAll(true);
+    try {
+      const { data } = await axios.post("/generer-emplois-formateurs", { semestre: "S1" });
+      flash(data.message ?? "Emplois générés.");
+      fetchAll();
+    } catch (e) {
+      flash(e.response?.data?.message ?? "Erreur lors de la génération.", "err");
+    } finally { setGeneratingAll(false); }
   };
 
   const supprimerEmploi = async (id) => {
@@ -1092,7 +1304,12 @@ export default function Emplois() {
             {emplois.length} emploi{emplois.length > 1 ? "s" : ""} enregistré{emplois.length > 1 ? "s" : ""}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {/* Générer tous les emplois formateurs en un clic */}
+          <button className="sp-btn sp-btn--secondary" onClick={genererTousEmploisFormateurs} disabled={generatingAll}
+            title="Génère automatiquement les emplois de tous les formateurs depuis les emplois du temps existants">
+            {generatingAll ? "Génération…" : <>{Ico.table} Générer tous les emplois formateurs</>}
+          </button>
           <button className="sp-btn sp-btn--secondary" onClick={() => setFmtModal(true)}>{Ico.table} Emploi formateur</button>
           <button className="sp-btn sp-btn--primary" onClick={() => setModal(true)}>{Ico.plus} Nouvel emploi</button>
         </div>
@@ -1108,6 +1325,16 @@ export default function Emplois() {
       {showModal && <ModalCreerEmploi onClose={() => setModal(false)} onSaved={() => { setModal(false); fetchAll(); flash("Emploi du temps créé."); }} groupes={groupes} plannings={plannings} />}
       {showFmtModal && <ModalFormateurTimetable onClose={() => setFmtModal(false)} formateurs={formateurs} onSaved={() => { fetchAll(); flash("Emploi du formateur sauvegardé."); }} />}
       {viewingFmtEmploi && <ModalViewFormateurEmploi record={viewingFmtEmploi} onClose={() => setViewingFmt(null)} onDelete={supprimerFormateurEmploi} />}
+      {/* Modal modification d'emploi */}
+      {emploiAModifier && (
+        <ModalModifierEmploi
+          emploi={emploiAModifier}
+          groupes={groupes}
+          plannings={plannings}
+          onClose={() => setEmploiAModifier(null)}
+          onSaved={() => { setEmploiAModifier(null); fetchAll(); flash("Emploi modifié avec succès."); afficherEmploi(emploiAModifier.id); }}
+        />
+      )}
 
       {loading && <div style={{ textAlign: "center", padding: "60px 0", color: "var(--sp-gray-400)" }}>Chargement…</div>}
 
@@ -1120,10 +1347,18 @@ export default function Emplois() {
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: "var(--sp-black)" }}>{toStr(e.groupe)}</div>
-                <button style={{ background: "#fee2e2", border: "none", borderRadius: 5, color: "#dc2626", cursor: "pointer", width: 24, height: 24, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-                  title="Supprimer" onClick={ev => { ev.stopPropagation(); supprimerEmploi(e.id); }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-                </button>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {/* Bouton Modifier emploi */}
+                  <button style={{ background: "#eff6ff", border: "none", borderRadius: 5, color: "#1d4ed8", cursor: "pointer", width: 24, height: 24, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                    title="Modifier cet emploi du temps"
+                    onClick={ev => { ev.stopPropagation(); ouvrirModification(e.id); }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button style={{ background: "#fee2e2", border: "none", borderRadius: 5, color: "#dc2626", cursor: "pointer", width: 24, height: 24, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                    title="Supprimer" onClick={ev => { ev.stopPropagation(); supprimerEmploi(e.id); }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                  </button>
+                </div>
               </div>
               <div style={{ fontSize: 11, color: "var(--sp-gray-400)", display: "flex", alignItems: "center", gap: 5 }}>
                 {Ico.cal} {toStr(e.periodeDebut ?? e.periode_debut ?? "—")}
@@ -1194,6 +1429,12 @@ export default function Emplois() {
               {toStr(emploiActif.groupe)} · {toStr(emploiActif.semestre)}
             </span>
             <div style={{ display: "flex", gap: 8 }}>
+              {/* Modifier l'emploi du temps depuis le document affiché */}
+              <button className="sp-btn sp-btn--secondary" style={{ height: 28, fontSize: 11, background: "rgba(255,255,255,.1)", color: "#fff", borderColor: "rgba(255,255,255,.2)" }}
+                onClick={() => ouvrirModification(emploiActif.id)}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4 }}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Modifier emploi
+              </button>
               <button className="sp-btn sp-btn--secondary" style={{ height: 28, fontSize: 11, background: "rgba(255,255,255,.1)", color: "#fff", borderColor: "rgba(255,255,255,.2)" }} onClick={handlePrint}>
                 {Ico.print} Imprimer
               </button>

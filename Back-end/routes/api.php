@@ -19,6 +19,17 @@ use Illuminate\Support\Facades\DB;
 
 Route::post('/login', [AuthController::class, 'login']);
 
+// Route publique : statistiques générales pour la page d'accueil (sans authentification)
+Route::get('/public-stats', function () {
+    return response()->json([
+        'total_secteurs'  => DB::table('secteurs')->count(),
+        'total_groupes'   => DB::table('groupes')->count(),
+        'total_filieres'  => DB::table('filieres')->count(),
+        'total_formateurs'=> DB::table('formateurs')->count(),
+        'total_modules'   => DB::table('modules')->count(),
+    ]);
+});
+
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -106,15 +117,23 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/salles',             [SalleController::class, 'index']);
         Route::post('/salles',            [SalleController::class, 'store']);
 
-        // Groupes pour le modal planning
-        Route::get('/pole-groupes', function () {
-            $groupes = DB::table('groupes')
+        // Groupes pour le modal planning — filtrés par le secteur du pôle connecté
+        Route::get('/pole-groupes', function (\Illuminate\Http\Request $request) {
+            $user      = $request->user();
+            $secteurId = $user->secteur_id; // Le pôle a toujours un secteur_id
+
+            $query = DB::table('groupes')
                 ->select('groupes.id', 'groupes.nom',
-                    DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere"))
-                ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id')
-                ->orderBy('groupes.nom')
-                ->get();
-            return response()->json(['data' => $groupes]);
+                    DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere"),
+                    'filieres.secteur_id')
+                ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id');
+
+            // Filtrer par secteur si l'utilisateur en a un
+            if ($secteurId) {
+                $query->where('filieres.secteur_id', $secteurId);
+            }
+
+            return response()->json(['data' => $query->orderBy('groupes.nom')->get()]);
         });
 
         // Formateurs pour le modal
@@ -140,7 +159,54 @@ Route::middleware('auth:sanctum')->group(function () {
             ]);
         });
 
-       
+        // Générer tous les emplois des formateurs depuis les emplois du temps existants
+        Route::post('/generer-emplois-formateurs', function (\Illuminate\Http\Request $request) {
+            $emplois    = \App\Models\EmploiDuTemps::all();
+            $jours      = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            $nbSeances  = 4;
+
+            // Regrouper les séances par formateur_id
+            $parFormateur = [];
+            foreach ($emplois as $emploi) {
+                if (!is_array($emploi->grille)) continue;
+                foreach ($jours as $jour) {
+                    foreach (($emploi->grille[$jour] ?? []) as $si => $cell) {
+                        if (empty($cell) || empty($cell['formateur_id'])) continue;
+                        $fid = (int)$cell['formateur_id'];
+                        if (!isset($parFormateur[$fid])) {
+                            $parFormateur[$fid] = [];
+                            foreach ($jours as $j) $parFormateur[$fid][$j] = array_fill(0, $nbSeances, null);
+                        }
+                        // Ne pas écraser une séance déjà placée pour ce formateur
+                        if ($parFormateur[$fid][$jour][$si] === null) {
+                            $parFormateur[$fid][$jour][$si] = [
+                                'module'  => $cell['module']  ?? '—',
+                                'groupe'  => $emploi->groupe?->nom ?? '?',
+                                'salle'   => $cell['salle']   ?? '',
+                                'mode'    => $cell['mode']    ?? 'PRESENTIEL',
+                            ];
+                        }
+                    }
+                }
+            }
+
+            $created = 0;
+            $semestre = $request->semestre ?? 'S1';
+
+            foreach ($parFormateur as $fid => $grille) {
+                // Créer ou mettre à jour l'emploi du formateur
+                \App\Models\FormateurEmploi::updateOrCreate(
+                    ['formateur_id' => $fid, 'semestre' => $semestre],
+                    ['grille' => $grille]
+                );
+                $created++;
+            }
+
+            return response()->json([
+                'message' => "{$created} emploi(s) de formateur(s) générés avec succès.",
+                'count'   => $created,
+            ]);
+        });
     });
 
     Route::put('/plannings/{planning}', [PlanningController::class, 'update']);
