@@ -3,7 +3,6 @@ import axios from "axios";
 
 const AuthContext = createContext(null);
 
-// URL de l'API Laravel — override via REACT_APP_API_URL for ngrok/production
 axios.defaults.baseURL = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 export function AuthProvider({ children }) {

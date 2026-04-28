@@ -26,12 +26,7 @@ return [
         'http://127.0.0.1:3000',
     ],
 
-    // Allows any ngrok tunnel URL (free & paid plans)
-    'allowed_origins_patterns' => [
-        '#^https://[a-z0-9\-]+\.ngrok-free\.app$#',
-        '#^https://[a-z0-9\-]+\.ngrok\.io$#',
-        '#^https://[a-z0-9\-]+\.ngrok\.app$#',
-    ],
+    'allowed_origins_patterns' => [],
 
     // En-têtes autorisés dans les requêtes
     'allowed_headers' => ['*'],

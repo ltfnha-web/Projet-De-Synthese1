@@ -12,9 +12,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Trust ngrok and other reverse proxies
-        $middleware->trustProxies(at: '*');
-
         // Enregistrer le middleware de rôle
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
