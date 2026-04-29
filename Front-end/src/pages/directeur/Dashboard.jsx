@@ -6,6 +6,7 @@ import {
   BarElement, ArcElement, Tooltip, Legend,
 } from "chart.js";
 import { Icons } from "../../components/admin/Icons";
+import { useFilters, EXAM_TYPE_OPTIONS, normaliseExamType } from "../../context/FilterContext";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -108,14 +109,16 @@ export default function DirecteurDashboard() {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ── Filtres (envoyés au backend) ──
+  // ── Filtre exam type partagé avec Modules ──
+  const { examType: fExamType, setExamType: setFExamType } = useFilters();
+
+  // ── Filtres locaux ──
   const [fSecteur,  setFSecteur]  = useState("");
   const [fCreneau,  setFCreneau]  = useState("");
   const [fAnnee,    setFAnnee]    = useState("");
   const [fSeuil,    setFSeuil]    = useState("");
   const [fGroupe,   setFGroupe]   = useState("");
   const [fModule,   setFModule]   = useState("");
-  const [fExamType, setFExamType] = useState(""); // Filtre par type d'examen
 
   // ── Fetch avec params ──
   const fetchStats = useCallback(() => {
@@ -189,17 +192,8 @@ export default function DirecteurDashboard() {
   const handleSecteurChange = (v) => { setFSecteur(v); setFGroupe(""); setFModule(""); };
   const handleGroupeChange  = (v) => { setFGroupe(v);  setFModule(""); };
 
-  const EXAM_LABELS = {
-    EFF: "Fin de Formation (EFF)", "Fin de Formation": "Fin de Formation",
-    "Fin Formation": "Fin de Formation",
-    EFP: "Passage (EFP)", Passage: "Passage",
-    Qualifiante: "Qualifiante", Diplômante: "Diplômante",
-    EFM: "EFM", "1A": "1ère Année", "2A": "2ème Année", Aucun: "Aucun",
-  };
-  const examTypeOpts = [
-    { value: "", label: "Tous types d'examen" },
-    ...(stats?.exam_types_list || []).map(t => ({ value: t, label: EXAM_LABELS[t] || t })),
-  ];
+  const getExamLabel = (t) => EXAM_TYPE_OPTIONS.find(o => o.value === normaliseExamType(t))?.label || t || "Tous";
+  const examTypeOpts = EXAM_TYPE_OPTIONS;
 
   const hasFilters = fSecteur || fCreneau || fAnnee || fSeuil || fGroupe || fModule || fExamType;
   const resetAll   = () => { setFSecteur(""); setFCreneau(""); setFAnnee(""); setFSeuil(""); setFGroupe(""); setFModule(""); setFExamType(""); };
@@ -445,7 +439,7 @@ export default function DirecteurDashboard() {
             {fCreneau   && <Chip label={fCreneau === "CDJ" ? "Cours du Jour" : "Cours du Soir"}          onRemove={() => setFCreneau("")}   />}
             {fAnnee     && <Chip label={`${fAnnee}ère année`}                                             onRemove={() => setFAnnee("")}     />}
             {fSeuil     && <Chip label={fSeuil === "critique" ? "Critiques < 30%" : "À risque < 50%"}    onRemove={() => setFSeuil("")}     />}
-            {fExamType  && <Chip label={`Type : ${fExamType}`}                                            onRemove={() => setFExamType("")}  />}
+            {fExamType  && <Chip label={`Type : ${getExamLabel(fExamType)}`}                              onRemove={() => setFExamType("")}  />}
             {fGroupe    && <Chip label={`Groupe : ${(stats?.groupes_list || []).find(g => String(g.id) === String(fGroupe))?.nom || fGroupe}`} onRemove={() => { setFGroupe(""); setFModule(""); }} />}
             {fModule    && <Chip label={`Module : ${(stats?.modules_list || []).find(m => String(m.id) === String(fModule))?.code || fModule}`} onRemove={() => setFModule("")} />}
           </div>

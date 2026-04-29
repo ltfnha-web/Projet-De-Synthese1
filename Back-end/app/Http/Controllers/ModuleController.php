@@ -55,12 +55,20 @@ class ModuleController extends Controller
                     ? $q->where('mh_realisee_globale', '>', 0)
                     : $q->where('mh_realisee_globale', 0)
             )
-            ->when($request->type_formation, fn($q) =>
+            ->when(!$request->filled('exam_type') && $request->type_formation, fn($q) =>
                 $q->where('type_formation', $request->type_formation)
             )
-            ->when($request->filled('exam_type') && $request->exam_type !== '', fn($q) =>
-                $q->where('type_formation', $request->exam_type)
-            )
+            ->when($request->filled('exam_type') && $request->exam_type !== '', function ($q) use ($request) {
+                // Canonical → DB synonym map
+                $synonyms = [
+                    'Fin de Formation' => ['Fin de Formation', 'EFF', 'Fin Formation'],
+                    'Passage'          => ['Passage', 'EFP'],
+                    'Qualifiante'      => ['Qualifiante'],
+                    'Diplômante'       => ['Diplômante', 'Diplomante'],
+                ];
+                $values = $synonyms[$request->exam_type] ?? [$request->exam_type];
+                $q->whereIn('type_formation', $values);
+            })
             ->latest();
 
         return response()->json($query->paginate(15));

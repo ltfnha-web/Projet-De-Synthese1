@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { FilterProvider } from "./context/FilterContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import './styles/stylePole.css';
 
@@ -52,7 +53,9 @@ export default function App() {
           {/* DIRECTEUR */}
           <Route path="/directeur" element={
             <ProtectedRoute roles={["directeur"]}>
-              <AdminLayout />
+              <FilterProvider>
+                <AdminLayout />
+              </FilterProvider>
             </ProtectedRoute>
           }>
             <Route path="dashboard"    element={<DirecteurDashboard />} />

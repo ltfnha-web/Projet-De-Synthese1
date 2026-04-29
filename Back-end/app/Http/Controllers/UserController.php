@@ -220,11 +220,18 @@ class UserController extends Controller
         $groupeId  = $request->groupe_id;
         $moduleId  = $request->module_id;
 
-        $applyFilters = function ($query) use ($secteurId, $creneau, $annee, $examType, $groupeId, $moduleId) {
+        $examTypeSynonyms = [
+            'Fin de Formation' => ['Fin de Formation', 'EFF', 'Fin Formation'],
+            'Passage'          => ['Passage', 'EFP'],
+            'Qualifiante'      => ['Qualifiante'],
+            'Diplômante'       => ['Diplômante', 'Diplomante'],
+        ];
+
+        $applyFilters = function ($query) use ($secteurId, $creneau, $annee, $examType, $groupeId, $moduleId, $examTypeSynonyms) {
             if ($secteurId) $query->where('filieres.secteur_id', $secteurId);
             if ($creneau)   $query->where('groupes.creneau', $creneau);
             if ($annee)     $query->where('groupes.annee_formation', $annee);
-            if ($examType)  $query->where('modules.type_formation', $examType);
+            if ($examType)  $query->whereIn('modules.type_formation', $examTypeSynonyms[$examType] ?? [$examType]);
             if ($groupeId)  $query->where('groupes.id', $groupeId);
             if ($moduleId)  $query->where('modules.id', $moduleId);
             return $query;
@@ -235,18 +242,20 @@ class UserController extends Controller
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id');
 
+        $examValues = $examType ? ($examTypeSynonyms[$examType] ?? [$examType]) : null;
+
         $groupeScope = Groupe::join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
-            ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
-            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
-            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examType,  fn($q) => $q->whereExists(
+            ->when($secteurId,  fn($q) => $q->where('filieres.secteur_id', $secteurId))
+            ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examValues, fn($q) => $q->whereExists(
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
-                    ->where('modules.type_formation', $examType)
+                    ->whereIn('modules.type_formation', $examValues)
             ))
-            ->when($groupeId,  fn($q) => $q->where('groupes.id', $groupeId))
-            ->when($moduleId,  fn($q) => $q->whereExists(
+            ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
+            ->when($moduleId,   fn($q) => $q->whereExists(
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
@@ -255,12 +264,12 @@ class UserController extends Controller
 
         $moduleScope = Module::join('groupes',  'modules.groupe_id',  '=', 'groupes.id')
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
-            ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
-            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
-            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examType,  fn($q) => $q->where('modules.type_formation', $examType))
-            ->when($groupeId,  fn($q) => $q->where('modules.groupe_id', $groupeId))
-            ->when($moduleId,  fn($q) => $q->where('modules.id', $moduleId));
+            ->when($secteurId,  fn($q) => $q->where('filieres.secteur_id', $secteurId))
+            ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examValues, fn($q) => $q->whereIn('modules.type_formation', $examValues))
+            ->when($groupeId,   fn($q) => $q->where('modules.groupe_id', $groupeId))
+            ->when($moduleId,   fn($q) => $q->where('modules.id', $moduleId));
 
         $totalFormateurs   = Formateur::count();
         $totalFilieres     = $secteurId ? Filiere::where('secteur_id', $secteurId)->count() : Filiere::count();
@@ -336,14 +345,14 @@ class UserController extends Controller
             ->whereNotNull('groupes.annee_formation')
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
-            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examType,  fn($q) => $q->whereExists(
+            ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examValues, fn($q) => $q->whereExists(
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
-                    ->where('modules.type_formation', $examType)
+                    ->whereIn('modules.type_formation', $examValues)
             ))
-            ->when($groupeId,  fn($q) => $q->where('groupes.id', $groupeId))
+            ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->groupBy('groupes.annee_formation')
             ->orderBy('groupes.annee_formation')
             ->get();
@@ -353,11 +362,11 @@ class UserController extends Controller
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id')
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
-            ->when($creneau,   fn($q) => $q->where('groupes.creneau', $creneau))
-            ->when($annee,     fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examType,  fn($q) => $q->where('modules.type_formation', $examType))
-            ->when($groupeId,  fn($q) => $q->where('groupes.id', $groupeId))
-            ->when($moduleId,  fn($q) => $q->where('modules.id', $moduleId))
+            ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
+            ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
+            ->when($examValues, fn($q) => $q->whereIn('modules.type_formation', $examValues))
+            ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
+            ->when($moduleId,   fn($q) => $q->where('modules.id', $moduleId))
             ->select(
                 'groupes.id as groupe_id',
                 DB::raw('CASE WHEN SUM(modules.mh_drif) > 0

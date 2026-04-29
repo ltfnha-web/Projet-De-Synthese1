@@ -122,7 +122,13 @@ function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cell
     setSaving(true);
     try {
       const res = await axios.put(`/plannings/${planningId}/semaine`, { semaine_num: semaineNum, mh_prevue: mh });
-      onSave(planningId, semaineNum, mh, res.data.total_prevu, res.data.mh_restante);
+      onSave(planningId, semaineNum, mh, {
+        total_prevu:      res.data.total_prevu,
+        mh_restante:      res.data.mh_restante,
+        avce:             res.data.avce,
+        masse_par_semaine: res.data.masse_par_semaine,
+        remaining_weeks:  res.data.remaining_weeks,
+      });
     } catch { /* silently */ }
     setSaving(false);
     setEditing(false);
@@ -260,23 +266,20 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
         </span>
       </td>
       <td style={{ padding: "0 10px", borderRight: "2px solid var(--border)" }}>
-        {/* AVC réel (MH réalisée / MH DRIF) + taux de planification */}
+        {/* AVCE = MH réalisée réelle / MH DRIF */}
         <AvcBar
           mhDrif={p.mh_drif}
           totalPrevu={p.total_prevu}
           mhRealiseeModule={p.mh_realisee_module}
-          avcReel={p.avc_reel}
+          avcReel={p.avce ?? p.avc_reel}
         />
-        {/* Charge recommandée pour rattraper le retard */}
-        {(() => {
-          const charge = calcChargeRecommandee(p.mh_restante, p.semestre);
-          return charge ? (
-            <div title="Masse restante / Semaines restantes dans ce semestre"
-                 style={{ fontSize: 9, color: "var(--am6)", marginTop: 2, fontWeight: 600 }}>
-              Rec: {charge}h/sem
-            </div>
-          ) : null;
-        })()}
+        {/* Masse restante ÷ semaines restantes (calculé côté backend) */}
+        {p.masse_par_semaine > 0 && (
+          <div title={`Masse restante (${p.mh_restante}h) ÷ ${p.remaining_weeks} semaines restantes`}
+               style={{ fontSize: 9, color: "var(--am6)", marginTop: 2, fontWeight: 600 }}>
+            Rec: {p.masse_par_semaine}h/sem ({p.remaining_weeks} sem.)
+          </div>
+        )}
       </td>
       <td style={{ textAlign: "center", padding: "4px 6px" }}>
         {editing ? (

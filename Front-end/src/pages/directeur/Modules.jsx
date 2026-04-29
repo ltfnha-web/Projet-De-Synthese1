@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
 import { downloadTablePdf } from "../../utils/UsePdf";
+import { useFilters, EXAM_TYPE_OPTIONS } from "../../context/FilterContext";
 
 function ProgressBar({ realisee, drif }) {
   if (!drif) return <span style={{ color: "var(--sl4)", fontSize: 12 }}>—</span>;
@@ -21,18 +22,18 @@ function ProgressBar({ realisee, drif }) {
 
 const EXAM_TYPE_STYLES = {
   // Codes courts (EFF, EFP…)
-  EFF:              { label: "Fin Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
-  EFM:              { label: "EFM",            bg: "#fff1f2", color: "#be123c", border: "#fecdd3" },
-  EFP:              { label: "Passage",        bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
-  Qualifiante:      { label: "Qualifiante",    bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-  Passage:          { label: "Passage",        bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
-  "1A":             { label: "1ère Année",     bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
-  "2A":             { label: "2ème Année",     bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" },
-  Aucun:            { label: "Aucun",          bg: "var(--sl1)", color: "var(--sl4)", border: "var(--sl2)" },
+  EFF:              { label: "Fin de Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  EFM:              { label: "EFM",               bg: "#fff1f2", color: "#be123c", border: "#fecdd3" },
+  EFP:              { label: "Passage",           bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
+  Qualifiante:      { label: "Qualifiante",       bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+  Passage:          { label: "Passage",           bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
+  "1A":             { label: "1ère Année",        bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "2A":             { label: "2ème Année",        bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" },
+  Aucun:            { label: "Aucun",             bg: "var(--sl1)", color: "var(--sl4)", border: "var(--sl2)" },
   // Libellés longs (selon le fichier Excel importé)
-  "Fin de Formation":   { label: "Fin Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
-  "Fin Formation":      { label: "Fin Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
-  Diplômante:           { label: "Diplômante",     bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  "Fin de Formation":   { label: "Fin de Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  "Fin Formation":      { label: "Fin de Formation",  bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
+  Diplômante:           { label: "Diplômante",        bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" },
 };
 
 function ExamTypeBadge({ value }) {
@@ -63,7 +64,10 @@ export default function Modules() {
   const [formateurs, setFormateurs] = useState([]);
   const [loading, setLoading]     = useState(true);
 
-  // Filtres
+  // Filtre exam type partagé avec Dashboard
+  const { examType, setExamType } = useFilters();
+
+  // Filtres locaux
   const [search,    setSearch]    = useState("");
   const [filiere,   setFiliere]   = useState("");
   const [secteur,   setSecteur]   = useState("");
@@ -76,7 +80,6 @@ export default function Modules() {
   const [efmValid,  setEfmValid]  = useState("");
   const [demarre,   setDemarre]   = useState("");
   const [typeForm,  setTypeForm]  = useState("");
-  const [examType,  setExamType]  = useState("");
   const [page,      setPage]      = useState(1);
 
   useEffect(() => {
@@ -210,13 +213,13 @@ export default function Modules() {
                 onChange={e => { setEfm(e.target.value); setPage(1); }}>
                 <option value="">Séance EFM</option>
                 <option value="Oui">EFM prévu</option>
-                <option value="non">Sans EFM</option>
+                <option value="Non">Sans EFM</option>
               </select>
               <select className="form-select filter-select" style={filterSelectStyle} value={efmValid}
                 onChange={e => { setEfmValid(e.target.value); setPage(1); }}>
                 <option value="">Validation EFM</option>
                 <option value="Oui">EFM validé</option>
-                <option value="non">EFM non validé</option>
+                <option value="Non">EFM non validé</option>
               </select>
               <select className="form-select filter-select" style={filterSelectStyle} value={demarre}
                 onChange={e => { setDemarre(e.target.value); setPage(1); }}>
@@ -232,17 +235,9 @@ export default function Modules() {
               </select>
               <select className="form-select filter-select" style={{ ...filterSelectStyle, minWidth: 180 }} value={examType}
                 onChange={e => { setExamType(e.target.value); setPage(1); }}>
-                <option value="">Type d'examen</option>
-                <option value="EFF">Fin de Formation (EFF)</option>
-                <option value="Fin de Formation">Fin de Formation</option>
-                <option value="EFP">Passage (EFP)</option>
-                <option value="Passage">Passage</option>
-                <option value="Qualifiante">Qualifiante</option>
-                <option value="Diplômante">Diplômante</option>
-                <option value="EFM">EFM</option>
-                <option value="1A">1ère Année (1A)</option>
-                <option value="2A">2ème Année (2A)</option>
-                <option value="Aucun">Aucun</option>
+                {EXAM_TYPE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
 

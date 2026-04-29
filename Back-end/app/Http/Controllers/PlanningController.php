@@ -83,34 +83,51 @@ class PlanningController extends Controller
             $mhBySemaine = $p->semaines->pluck('mh_prevue', 'semaine_num');
 
             $totalPrevu   = $p->semaines->sum('mh_prevue');
-            $mhRestante   = max(0, ($p->mh_drif ?? 0) - $totalPrevu);
+            $mhDrif       = (float)($p->mh_drif ?? 0);
+            $mhRestante   = max(0, $mhDrif - $totalPrevu);
 
             // MH réellement réalisée provenant du module (données réelles)
             $mhRealiseeModule = (float)($p->module?->mh_realisee_globale ?? 0);
 
-            // AVC réel = MH réalisée du module / MH DRIF
-            $mhDrif = (float)($p->mh_drif ?? 0);
-            $avcReel = $mhDrif > 0 ? round(($mhRealiseeModule / $mhDrif) * 100, 1) : 0;
+            // AVCE = MH réalisée réelle / MH DRIF
+            $avce = $mhDrif > 0 ? round(($mhRealiseeModule / $mhDrif) * 100, 1) : 0;
+
+            // Masse restante réelle = DRIF - réalisée module
+            $mhRestanteReelle = max(0, $mhDrif - $mhRealiseeModule);
+
+            // Semaines restantes dans le semestre (non encore planifiées)
+            $semestreNum      = $p->semestre === 'S2' ? 2 : 1;
+            $semainesPlanif   = $p->semaines->pluck('semaine_num')->toArray();
+            $remainingWeeks   = collect($semaines)
+                ->where('semestre', $semestreNum)
+                ->filter(fn($s) => !in_array($s['num'], $semainesPlanif))
+                ->count();
+
+            $massParSemaine = $remainingWeeks > 0 ? round($mhRestante / $remainingWeeks, 2) : 0;
 
             return [
-                'id'                 => $p->id,
-                'groupe_id'          => $p->groupe_id,
-                'groupe_nom'         => $p->groupe?->nom ?? $p->groupe?->code ?? '—',
-                'module_id'          => $p->module_id,
-                'module_nom'         => $p->module?->intitule ?? '—',
-                'formateur_id'       => $p->formateur_id,
-                'formateur_nom'      => $p->formateur?->nom ?? '—',
-                'semestre'           => $p->semestre,
-                'mh_drif'            => $mhDrif,
-                'mh_realisee'        => $p->mh_realisee ?? 0,
-                'mh_realisee_module' => $mhRealiseeModule, // Valeur réelle depuis le module
-                'avc_reel'           => $avcReel,          // AVC = mh_realisee_module / mh_drif
-                'mh_restante'        => $mhRestante,
-                'total_prevu'        => $totalPrevu,
-                'type'               => $p->type ?? 'Régionale',
-                'mode'               => $p->mode ?? 'PRESENTIEL',
-                'charge_hebdo'       => $p->charge_hebdo ?? 0,
-                'semaines'           => $mhBySemaine,
+                'id'                   => $p->id,
+                'groupe_id'            => $p->groupe_id,
+                'groupe_nom'           => $p->groupe?->nom ?? $p->groupe?->code ?? '—',
+                'module_id'            => $p->module_id,
+                'module_nom'           => $p->module?->intitule ?? '—',
+                'formateur_id'         => $p->formateur_id,
+                'formateur_nom'        => $p->formateur?->nom ?? '—',
+                'semestre'             => $p->semestre,
+                'mh_drif'              => $mhDrif,
+                'mh_realisee'          => $p->mh_realisee ?? 0,
+                'mh_realisee_module'   => $mhRealiseeModule,
+                'avce'                 => $avce,
+                'avc_reel'             => $avce,
+                'mh_restante'          => $mhRestante,
+                'mh_restante_reelle'   => $mhRestanteReelle,
+                'masse_par_semaine'    => $massParSemaine,
+                'remaining_weeks'      => $remainingWeeks,
+                'total_prevu'          => $totalPrevu,
+                'type'                 => $p->type ?? 'Régionale',
+                'mode'                 => $p->mode ?? 'PRESENTIEL',
+                'charge_hebdo'         => $p->charge_hebdo ?? 0,
+                'semaines'             => $mhBySemaine,
             ];
         });
 
@@ -182,13 +199,35 @@ class PlanningController extends Controller
             ]
         );
 
-        $totalPrevu = PlanningSemaine::where('planning_id', $planning->id)->sum('mh_prevue');
-        $planning->update(['mh_realisee' => $totalPrevu]);
+        $totalPrevu  = PlanningSemaine::where('planning_id', $planning->id)->sum('mh_prevue');
+        $mhRestante  = max(0, $planning->mh_drif - $totalPrevu);
+
+        // Recalculate AVCE from module actual data
+        $mhRealiseeModule = (float)($planning->module?->mh_realisee_globale ?? 0);
+        $mhDrif           = (float)($planning->mh_drif ?? 0);
+        $avce             = $mhDrif > 0 ? round(($mhRealiseeModule / $mhDrif) * 100, 1) : 0;
+
+        // Remaining weeks in semester
+        $allSemaines      = self::getSemainesAnnee();
+        $semestreNum      = $planning->semestre === 'S2' ? 2 : 1;
+        $semainesPlanif   = PlanningSemaine::where('planning_id', $planning->id)->pluck('semaine_num')->toArray();
+        $remainingWeeks   = collect($allSemaines)
+            ->where('semestre', $semestreNum)
+            ->filter(fn($s) => !in_array($s['num'], $semainesPlanif))
+            ->count();
+
+        $massParSemaine = $remainingWeeks > 0 ? round($mhRestante / $remainingWeeks, 2) : 0;
+
+        // Store total_prevu in charge_hebdo is not right — keep mh_realisee for actual hours only
+        $planning->update(['charge_hebdo' => $planning->charge_hebdo]);
 
         return response()->json([
-            'ok'          => true,
-            'total_prevu' => $totalPrevu,
-            'mh_restante' => max(0, $planning->mh_drif - $totalPrevu),
+            'ok'               => true,
+            'total_prevu'      => $totalPrevu,
+            'mh_restante'      => $mhRestante,
+            'avce'             => $avce,
+            'masse_par_semaine'=> $massParSemaine,
+            'remaining_weeks'  => $remainingWeeks,
         ]);
     }
 

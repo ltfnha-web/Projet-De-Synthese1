@@ -312,12 +312,26 @@ class EmploiController extends Controller
     {
         $conflicts = [];
 
-        // Récupérer tous les emplois existants (sauf celui qu'on modifie)
+        // Filière du groupe courant (pour exception DISTANCIEL même filière)
+        $currentFiliere = DB::table('groupes')
+            ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+            ->where('groupes.id', $groupeId)
+            ->value('filieres.id');
+
+        // Récupérer tous les emplois existants avec la filière de leur groupe
         $autresEmplois = EmploiDuTemps::where('groupe_id', '!=', $groupeId)
             ->when($excludeEmploiId, fn($q) => $q->where('id', '!=', $excludeEmploiId))
-            ->get();
+            ->get()
+            ->map(function ($emploi) {
+                $filiereId = DB::table('groupes')
+                    ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+                    ->where('groupes.id', $emploi->groupe_id)
+                    ->value('filieres.id');
+                $emploi->filiere_id = $filiereId;
+                return $emploi;
+            });
 
-        // Construire un index : formateur_id → [(jour, seance, mode, groupe)]
+        // Index : formateur_id → [(jour, seance, mode, filiere_id)]
         $existants = [];
         foreach ($autresEmplois as $emploi) {
             if (!is_array($emploi->grille)) continue;
@@ -326,9 +340,12 @@ class EmploiController extends Controller
                     if (empty($cell) || empty($cell['formateur_id'])) continue;
                     $fid  = (int)$cell['formateur_id'];
                     $mode = $cell['mode'] ?? 'PRESENTIEL';
-                    // Ignorer les séances à distance (pas de contrainte horaire physique)
-                    if ($mode === 'DISTANCIEL') continue;
-                    $existants[$fid][] = ['jour' => $jour, 'seance' => (int)$si];
+                    $existants[$fid][] = [
+                        'jour'       => $jour,
+                        'seance'     => (int)$si,
+                        'mode'       => $mode,
+                        'filiere_id' => $emploi->filiere_id,
+                    ];
                 }
             }
         }
@@ -337,18 +354,25 @@ class EmploiController extends Controller
         foreach (self::JOURS as $jour) {
             foreach (($newGrille[$jour] ?? []) as $si => $cell) {
                 if (empty($cell) || empty($cell['formateur_id'])) continue;
-                $fid  = (int)$cell['formateur_id'];
-                $mode = $cell['mode'] ?? 'PRESENTIEL';
-                // Les séances à distance ne génèrent pas de conflit
-                if ($mode === 'DISTANCIEL') continue;
+                $fid     = (int)$cell['formateur_id'];
+                $mode    = $cell['mode'] ?? 'PRESENTIEL';
 
                 if (!isset($existants[$fid])) continue;
 
                 foreach ($existants[$fid] as $slot) {
-                    if ($slot['jour'] === $jour && $slot['seance'] === (int)$si) {
-                        $nom = $cell['formateur'] ?? "Formateur #{$fid}";
-                        $conflicts[] = "Le formateur {$nom} a déjà une séance le {$jour} séance " . ((int)$si + 1) . ".";
-                    }
+                    if ($slot['jour'] !== $jour || $slot['seance'] !== (int)$si) continue;
+
+                    // Exception DISTANCIEL : autorisé UNIQUEMENT si les deux cours sont
+                    // à distance ET appartiennent à la même filière
+                    $bothDistanciel = ($mode === 'DISTANCIEL') && ($slot['mode'] === 'DISTANCIEL');
+                    $sameFiliere    = $currentFiliere && $slot['filiere_id'] && ($currentFiliere === $slot['filiere_id']);
+                    if ($bothDistanciel && $sameFiliere) continue;
+
+                    $nom = $cell['formateur'] ?? "Formateur #{$fid}";
+                    $reason = ($bothDistanciel && !$sameFiliere)
+                        ? " (formation à distance, filières différentes)"
+                        : "";
+                    $conflicts[] = "Le formateur {$nom} a déjà une séance le {$jour} séance " . ((int)$si + 1) . "{$reason}.";
                 }
             }
         }
