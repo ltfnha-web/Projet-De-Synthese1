@@ -11,13 +11,15 @@ class EmploiDuTemps extends Model
     protected $table = 'emplois_du_temps';
 
     protected $fillable = [
-    'groupe_id',
-    'created_by',
-    'periode_debut',
-    'semestre',
-    'grille',
-    'valide',
-];
+        'groupe_id',
+        'created_by',
+        'periode_debut',
+        'semestre',
+        'grille',
+        'valide',
+        'formateur_parrain',
+        'signataire_nom',
+    ];
     protected $casts = [
         'grille'        => 'array',
         'periode_debut' => 'date',

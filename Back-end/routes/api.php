@@ -19,6 +19,39 @@ use Illuminate\Support\Facades\DB;
 
 Route::post('/login', [AuthController::class, 'login']);
 
+// Route publique : liste des groupes (pour l'espace stagiaire)
+Route::get('/public-groupes', function () {
+    $groupes = DB::table('groupes')
+        ->select('groupes.id', 'groupes.nom',
+            DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere"))
+        ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+        ->orderBy('groupes.nom')
+        ->get();
+    return response()->json(['data' => $groupes]);
+});
+
+// Route publique : emploi du temps par groupe (pour l'espace stagiaire)
+Route::get('/public-emploi', function (\Illuminate\Http\Request $request) {
+    if (!$request->filled('groupe_id')) {
+        return response()->json(['data' => null]);
+    }
+    $emploi = \App\Models\EmploiDuTemps::with('groupe')
+        ->where('groupe_id', $request->groupe_id)
+        ->orderByDesc('created_at')
+        ->first();
+    if (!$emploi) {
+        return response()->json(['data' => null, 'message' => 'Aucun emploi trouvé pour ce groupe.']);
+    }
+    return response()->json(['data' => [
+        'id'               => $emploi->id,
+        'groupe'           => $emploi->groupe?->nom ?? '—',
+        'semestre'         => $emploi->semestre,
+        'periodeDebut'     => $emploi->periode_debut?->format('d/m/Y'),
+        'formateur_parrain'=> $emploi->formateur_parrain,
+        'grille'           => $emploi->grille,
+    ]]);
+});
+
 // Route publique : statistiques générales pour la page d'accueil (sans authentification)
 Route::get('/public-stats', function () {
     return response()->json([

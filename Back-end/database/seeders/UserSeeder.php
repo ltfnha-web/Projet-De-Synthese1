@@ -48,6 +48,18 @@ class UserSeeder extends Seeder
             ]
         );
 
+        // Stagiaire
+        User::updateOrCreate(
+            ['email' => 'stagiaire@ofppt.ma'],
+            [
+                'name'      => 'Stagiaire Test',
+                'password'  => Hash::make('stagiaire123'),
+                'role'      => 'stagiaire',
+                'is_active' => true,
+                'statut'    => 'actif',
+            ]
+        );
+
         $this->command->info('Users créés avec succès ✅');
     }
 }

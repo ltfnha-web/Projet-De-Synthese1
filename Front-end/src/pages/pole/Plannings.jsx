@@ -50,39 +50,19 @@ function SemBadge({ s }) {
   return <span className={`badge ${s === "S1" ? "badge-info" : "badge-purple"}`}>{s}</span>;
 }
 
-// AVC réel = MH réalisée (données module) / MH DRIF
-function AvcBar({ mhDrif, totalPrevu, mhRealiseeModule, avcReel }) {
+function AvcBar({ mhDrif, totalPrevu }) {
   if (!mhDrif) return <span style={{ color: "var(--sl4)", fontSize: 11 }}>—</span>;
-
-  // AVC réel = mh_realisee_module / mh_drif (si disponible, sinon fallback sur totalPrevu)
-  const pctReel   = avcReel !== undefined ? Math.min(120, avcReel) : Math.min(100, (totalPrevu / mhDrif) * 100);
-  const pctPlanif = Math.min(100, (totalPrevu / mhDrif) * 100); // Taux de planification
-
-  const colorReel   = pctReel >= 90 ? "#7c3aed" : pctReel >= 60 ? "var(--em5)" : pctReel >= 30 ? "var(--am5)" : "var(--rd5)";
-  const colorPlanif = "#94a3b8"; // Gris pour la planification
-
+  const pct   = Math.min(100, ((totalPrevu ?? 0) / mhDrif) * 100);
+  const color = pct >= 90 ? "#7c3aed" : pct >= 60 ? "var(--em5)" : pct >= 30 ? "var(--am5)" : "var(--rd5)";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 100 }}>
-      {/* Barre AVC réel */}
-      <div title={`AVC réel : ${pctReel.toFixed(1)}% (MH réalisée / MH DRIF)`}
-           style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <div style={{ flex: 1, height: 4, background: "var(--sl2)", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ width: `${Math.min(100, pctReel)}%`, height: "100%", background: colorReel, borderRadius: 2, transition: "width .3s" }} />
-        </div>
-        <span style={{ fontSize: 10, fontWeight: 700, color: colorReel, minWidth: 34, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-          {pctReel.toFixed(0)}%
-        </span>
+    <div title={`Avancement : ${pct.toFixed(1)}% — ${totalPrevu ?? 0}h planifiés / ${mhDrif}h`}
+         style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 100 }}>
+      <div style={{ flex: 1, height: 4, background: "var(--sl2)", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2, transition: "width .3s" }} />
       </div>
-      {/* Barre planification (grise) */}
-      <div title={`Planifié : ${pctPlanif.toFixed(1)}% des MH distribués dans le planning`}
-           style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <div style={{ flex: 1, height: 3, background: "var(--sl2)", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ width: `${pctPlanif}%`, height: "100%", background: colorPlanif, borderRadius: 2 }} />
-        </div>
-        <span style={{ fontSize: 9, color: colorPlanif, minWidth: 34, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-          {pctPlanif.toFixed(0)}%
-        </span>
-      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color, minWidth: 34, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+        {pct.toFixed(0)}%
+      </span>
     </div>
   );
 }
@@ -170,22 +150,39 @@ function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cell
 }
 
 // ── PlanningRow ───────────────────────────────────────────────────────────────
-function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCellSave, onDelete, onAutoOpen, onUpdate, onFlash, stagesBloquees }) {
+function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, formateurs, onCellSave, onDelete, onDistributed, onUpdate, onFlash, stagesBloquees }) {
   const [editing, setEditing]   = useState(false);
   const [editData, setEditData] = useState({});
   const [saving, setSaving]     = useState(false);
   const rowBg = idx % 2 !== 0 ? "var(--sl0)" : "var(--surface)";
+
+  // Exclude stage weeks from all MH calculations
+  const stageWeeks         = (stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number);
+  const semestreNum        = p.semestre === "S2" ? 2 : 1;
+  const semWeeks           = (semainesAnnee ?? []).filter(s => s.semestre === semestreNum);
+  const totalPrevuSansStage = Object.entries(p.semaines ?? {})
+    .filter(([k]) => !stageWeeks.includes(Number(k)))
+    .reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
+  const mhRestanteReelle   = Math.max(0, (p.mh_drif ?? 0) - totalPrevuSansStage);
+  const plannedWeeks       = Object.entries(p.semaines ?? {})
+    .filter(([k, v]) => parseFloat(v) > 0 && !stageWeeks.includes(Number(k)))
+    .map(([k]) => Number(k));
+  const freeWeeks          = semWeeks.filter(s => !plannedWeeks.includes(s.num) && !stageWeeks.includes(s.num));
+  const recCharge          = freeWeeks.length > 0 && mhRestanteReelle > 0
+    ? (mhRestanteReelle / freeWeeks.length).toFixed(1)
+    : null;
 
   const startEdit = () => {
     setEditData({
       formateur_id: String(p.formateur_id ?? ""),
       semestre:     p.semestre ?? "S1",
       mh_drif:      p.mh_drif ?? "",
-      charge_hebdo: p.charge_hebdo ?? "",
+      charge_hebdo: recCharge ?? calcChargeRecommandee(mhRestanteReelle, p.semestre ?? "S1") ?? "",
       type:         p.type ?? "Régionale",
     });
     setEditing(true);
   };
+
   const cancelEdit = () => setEditing(false);
   const saveEdit = async () => {
     setSaving(true);
@@ -203,9 +200,14 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
         semestre:      editData.semestre,
         mh_drif:       parseInt(editData.mh_drif),
       });
+      const charge = parseFloat(editData.charge_hebdo);
+      if (charge > 0) {
+        const distRes = await axios.post(`/plannings/${p.id}/auto-distribuer`, { charge_hebdo: charge });
+        onDistributed(p.id, { semaines: distRes.data.semaines, total_prevu: distRes.data.total_prevu, mh_restante: distRes.data.mh_restante });
+      }
       setEditing(false);
     } catch (e) {
-      onFlash(e.response?.data?.message ?? JSON.stringify(e.response?.data) ?? "Erreur de modification.", "err");
+      onFlash(e.response?.data?.message ?? JSON.stringify(e.response?.data) ?? "Erreur.", "err");
     }
     setSaving(false);
   };
@@ -253,31 +255,33 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
       </td>
       <td style={{ textAlign: "center", whiteSpace: "nowrap", padding: editing ? "5px 6px" : undefined }}>
         {editing ? (
-          <input style={{ ...inpStyle, width: 64, textAlign: "center" }} type="number" min="1"
-            value={editData.mh_drif}
-            onChange={e => setEditData(d => ({ ...d, mh_drif: e.target.value, charge_hebdo: calcCharge(e.target.value) }))} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+            <input style={{ ...inpStyle, width: 64, textAlign: "center" }} type="number" min="1"
+              value={editData.mh_drif}
+              onChange={e => setEditData(d => ({ ...d, mh_drif: e.target.value, charge_hebdo: calcChargeRecommandee(parseFloat(e.target.value), d.semestre) }))} />
+            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <input style={{ ...inpStyle, width: 48, height: 24, fontSize: 11, textAlign: "center", padding: "0 4px" }}
+                type="number" min="0.5" step="0.5" placeholder="h/s"
+                value={editData.charge_hebdo}
+                onChange={e => setEditData(d => ({ ...d, charge_hebdo: e.target.value }))} />
+              <span style={{ fontSize: 9, color: "var(--sl4)" }}>h/s</span>
+            </div>
+          </div>
         ) : (
           <span style={{ fontWeight: 700, fontSize: 12, color: "var(--sl8)" }}>{p.mh_drif}h</span>
         )}
       </td>
       <td style={{ textAlign: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: p.mh_restante > 0 ? "var(--rd5)" : "var(--em6)" }}>
-          {p.mh_restante > 0 ? `${p.mh_restante}h` : "—"}
+        <span style={{ fontSize: 11, fontWeight: 700, color: mhRestanteReelle > 0 ? "var(--rd5)" : "var(--em6)" }}>
+          {mhRestanteReelle > 0 ? `${mhRestanteReelle}h` : "—"}
         </span>
       </td>
       <td style={{ padding: "0 10px", borderRight: "2px solid var(--border)" }}>
-        {/* AVCE = MH réalisée réelle / MH DRIF */}
-        <AvcBar
-          mhDrif={p.mh_drif}
-          totalPrevu={p.total_prevu}
-          mhRealiseeModule={p.mh_realisee_module}
-          avcReel={p.avce ?? p.avc_reel}
-        />
-        {/* Masse restante ÷ semaines restantes (calculé côté backend) */}
-        {p.masse_par_semaine > 0 && (
-          <div title={`Masse restante (${p.mh_restante}h) ÷ ${p.remaining_weeks} semaines restantes`}
+        <AvcBar mhDrif={p.mh_drif} totalPrevu={totalPrevuSansStage} />
+        {recCharge && (
+          <div title={`MH restante (${mhRestanteReelle}h) ÷ ${freeWeeks.length} sem. libres (hors stages)`}
                style={{ fontSize: 9, color: "var(--am6)", marginTop: 2, fontWeight: 600 }}>
-            Rec: {p.masse_par_semaine}h/sem ({p.remaining_weeks} sem.)
+            Rec: {recCharge}h/sem ({freeWeeks.length} sem.)
           </div>
         )}
       </td>
@@ -328,8 +332,7 @@ function PlanningRow({ p, idx, semainesAffichees, premiereS2, formateurs, onCell
           </>
         ) : (
           <>
-            <button className="btn-icon btn-icon-edit" title="Modifier" onClick={startEdit}>{Ico.edit}</button>
-            <button className="btn-icon btn-icon-edit" title="Auto-distribuer" onClick={() => onAutoOpen(p)}>{Ico.magic}</button>
+            <button className="btn-icon btn-icon-edit" title="Modifier / Distribuer" onClick={startEdit}>{Ico.edit}</button>
             <button className="btn-icon btn-icon-del" title="Supprimer" onClick={() => onDelete(p.id)}>{Ico.trash}</button>
           </>
         )}
@@ -413,11 +416,7 @@ export default function Plannings() {
   const [form, setForm]     = useState(FORM_INIT);
   const [saving, setSaving] = useState(false);
   const [pendingModules, setPendingModules] = useState({});
-  const [autoModal, setAutoModal]   = useState(false);
-  const [autoTarget, setAutoTarget] = useState(null);
-  const [autoCharge, setAutoCharge] = useState("");
-  const [autoSaving, setAutoSaving] = useState(false);
-  const [stagesBloquees, setStagesBloquees] = useState({}); // { groupe_id: [semaine_num, ...] }
+  const [stagesBloquees, setStagesBloquees] = useState({});
 
   const flash = (msg, type = "ok") => {
     setAlert({ msg, type });
@@ -461,6 +460,8 @@ export default function Plannings() {
     if (!modal) setModules([]);
   }, [modal]);
 
+  const normSem = (s) => s === 1 || s === "1" ? "S1" : s === 2 || s === "2" ? "S2" : (s ?? "S1");
+
   const computePendingModules = (groupeId, allModules, existingPlannings, formateursMap) => {
     const usedModuleIds = new Set(
       existingPlannings.filter(p => String(p.groupe_id) === String(groupeId)).map(p => p.module_id)
@@ -470,11 +471,11 @@ export default function Plannings() {
       .map(m => ({
         module_id:     m.id,
         module_nom:    toStr(m.intitule ?? m.code ?? `Module ${m.id}`),
-        semestre:      m.semestre ?? "S1",
+        semestre:      normSem(m.semestre),
         mh_drif:       m.mh_drif ?? 0,
         formateur_id:  m.formateur_id ? String(m.formateur_id) : "",
         formateur_nom: m.formateur_id ? (formateursMap[m.formateur_id] ?? "") : "",
-        charge_hebdo:  calcCharge(m.mh_drif),
+        charge_hebdo:  calcChargeRecommandee(m.mh_drif, normSem(m.semestre)),
       }));
   };
 
@@ -489,7 +490,7 @@ export default function Plannings() {
     setForm(p => ({
       ...p,
       module_id:    moduleId,
-      semestre:     mod.semestre ?? "S1",
+      semestre:     normSem(mod.semestre),
       mh_drif:      parseFloat(mod.mh_drif) || "",
       charge_hebdo: calcCharge(mod.mh_drif),
       formateur_id: mod.formateur_id ? String(mod.formateur_id) : "",
@@ -497,7 +498,7 @@ export default function Plannings() {
   };
 
   const handleMhChange = (val) => {
-    setForm(p => ({ ...p, mh_drif: val, charge_hebdo: calcCharge(parseFloat(val)) }));
+    setForm(p => ({ ...p, mh_drif: val, charge_hebdo: calcChargeRecommandee(parseFloat(val), p.semestre) }));
   };
 
   const submitForm = async () => {
@@ -587,9 +588,15 @@ export default function Plannings() {
     setPlannings(prev => prev.map(p => p.id !== id ? p : { ...p, ...updated }));
   };
 
-  const handleCellSave = (planningId, semaineNum, mh, totalPrevu, mhRestante) => {
+  const handleCellSave = (planningId, semaineNum, mh, stats) => {
     setPlannings(prev => prev.map(p => p.id !== planningId ? p : {
-      ...p, semaines: { ...p.semaines, [semaineNum]: mh }, total_prevu: totalPrevu, mh_restante: mhRestante,
+      ...p,
+      semaines:          { ...p.semaines, [semaineNum]: mh },
+      total_prevu:       stats.total_prevu       ?? p.total_prevu,
+      mh_restante:       stats.mh_restante       ?? p.mh_restante,
+      avce:              stats.avce              ?? p.avce,
+      masse_par_semaine: stats.masse_par_semaine ?? p.masse_par_semaine,
+      remaining_weeks:   stats.remaining_weeks   ?? p.remaining_weeks,
     }));
   };
 
@@ -602,20 +609,10 @@ export default function Plannings() {
     } catch { flash("Erreur de suppression.", "err"); }
   };
 
-  const openAutoModal = (p) => { setAutoTarget(p); setAutoCharge(calcCharge(p.mh_drif)); setAutoModal(true); };
-
-  const submitAuto = async () => {
-    if (!autoCharge || parseFloat(autoCharge) <= 0) { flash("Entrez une charge hebdomadaire.", "err"); return; }
-    setAutoSaving(true);
-    try {
-      const res = await axios.post(`/plannings/${autoTarget.id}/auto-distribuer`, { charge_hebdo: parseFloat(autoCharge) });
-      flash("Distribution effectuée.");
-      setAutoModal(false);
-      setPlannings(prev => prev.map(p => p.id !== autoTarget.id ? p : {
-        ...p, semaines: res.data.semaines, total_prevu: res.data.total_prevu, mh_restante: res.data.mh_restante,
-      }));
-    } catch { flash("Erreur.", "err"); }
-    setAutoSaving(false);
+  const handleDistributed = (planningId, data) => {
+    setPlannings(prev => prev.map(p => p.id !== planningId ? p : {
+      ...p, semaines: data.semaines, total_prevu: data.total_prevu, mh_restante: data.mh_restante,
+    }));
   };
 
   const semainesAffichees = filterSemestre
@@ -624,7 +621,10 @@ export default function Plannings() {
   const premiereS2 = semainesAnnee.find(s => s.semestre === 2)?.num;
   const totalParSemaine = {};
   semainesAffichees.forEach(s => {
-    totalParSemaine[s.num] = plannings.reduce((acc, p) => acc + (parseFloat(p.semaines?.[s.num]) || 0), 0);
+    totalParSemaine[s.num] = plannings.reduce((acc, p) => {
+      const isStage = (stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number).includes(s.num);
+      return isStage ? acc : acc + (parseFloat(p.semaines?.[s.num]) || 0);
+    }, 0);
   });
   const pendingGroupeIds = Object.keys(pendingModules);
 
@@ -780,11 +780,11 @@ export default function Plannings() {
                 ) : plannings.map((p, idx) => (
                   <PlanningRow
                     key={p.id} p={p} idx={idx}
-                    semainesAffichees={semainesAffichees} premiereS2={premiereS2}
+                    semainesAffichees={semainesAffichees} semainesAnnee={semainesAnnee} premiereS2={premiereS2}
                     formateurs={formateurs}
                     onCellSave={handleCellSave}
                     onDelete={deletePlanning}
-                    onAutoOpen={openAutoModal}
+                    onDistributed={handleDistributed}
                     onUpdate={handleUpdate}
                     onFlash={flash}
                     stagesBloquees={stagesBloquees}
@@ -873,7 +873,7 @@ export default function Plannings() {
                   value={form.mh_drif} onChange={e => handleMhChange(e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">MH / semaine <span style={{ fontSize: 10, color: "var(--sl4)", marginLeft: 4, fontWeight: 400, textTransform: "none" }}>(modifiable)</span></label>
+                <label className="form-label">MH restante / semaine <span style={{ fontSize: 10, color: "var(--sl4)", marginLeft: 4, fontWeight: 400, textTransform: "none" }}>(modifiable)</span></label>
                 <input className="form-input" type="number" min="0.5" step="0.5" placeholder="auto"
                   value={form.charge_hebdo} onChange={e => setForm(p => ({ ...p, charge_hebdo: e.target.value }))} />
               </div>
@@ -917,52 +917,6 @@ export default function Plannings() {
               <button className="btn-secondary" onClick={() => setModal(false)}>Annuler</button>
               <button className="btn-primary" onClick={submitForm} disabled={saving}>
                 {saving ? "Enregistrement..." : "Créer le planning"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {autoModal && autoTarget && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setAutoModal(false)}>
-          <div className="modal" style={{ width: 420 }}>
-            <div className="modal-header">
-              <div className="modal-title">Distribution automatique</div>
-              <button className="modal-close" onClick={() => setAutoModal(false)}>{Ico.close}</button>
-            </div>
-            <div style={{ background: "var(--sl0)", borderRadius: "var(--r-md)", padding: "12px 16px", marginBottom: 20, border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 11, color: "var(--sl5)", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".4px", fontWeight: 600 }}>Planning sélectionné</div>
-              <div style={{ fontWeight: 700, color: "var(--sl8)", fontSize: 14 }}>{toStr(autoTarget.groupe_nom)}</div>
-              <div style={{ fontSize: 12, color: "var(--sl6)", marginTop: 2 }}>{toStr(autoTarget.module_nom)}</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                <SemBadge s={autoTarget.semestre} />
-                <span style={{ fontSize: 12, color: "var(--sl5)" }}>{autoTarget.mh_drif}h DRIF</span>
-                {autoTarget.mh_restante > 0 && (
-                  <span style={{ fontSize: 12, color: "var(--rd5)", fontWeight: 600 }}>{autoTarget.mh_restante}h restantes</span>
-                )}
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">MH par semaine</label>
-              <input className="form-input" type="number" min="0.5" step="0.5"
-                placeholder={`Suggéré : ${calcCharge(autoTarget.mh_drif)}`}
-                value={autoCharge} onChange={e => setAutoCharge(e.target.value)} />
-            </div>
-            {autoCharge > 0 && (
-              <div style={{ padding: "9px 12px", background: "var(--p0)", border: "1px solid var(--p1)", borderRadius: "var(--r-md)", fontSize: 12, color: "var(--p7)", marginBottom: 4, display: "flex", gap: 6, alignItems: "center" }}>
-                {Ico.info}
-                <span>
-                  {autoTarget.mh_drif}h à raison de <strong>{autoCharge}h/sem</strong>
-                  {" = "}
-                  <strong style={{ color: "var(--p6)" }}>{Math.ceil(autoTarget.mh_drif / autoCharge)} sem.</strong>
-                  {" sur "}<strong>{NB_SEM}</strong> disponibles en <strong>{autoTarget.semestre}</strong>
-                </span>
-              </div>
-            )}
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setAutoModal(false)}>Annuler</button>
-              <button className="btn-primary" onClick={submitAuto} disabled={autoSaving}>
-                {autoSaving ? "Distribution..." : "Distribuer"}
               </button>
             </div>
           </div>

@@ -261,7 +261,7 @@ export default function Modules() {
                 <tr>
                   <th>#</th><th>Code</th><th>Intitulé</th><th>Groupe</th>
                   <th>Formateur</th><th>MH DRIF</th><th>Réalisée</th>
-                  <th style={{ minWidth: 110 }}>Progression</th>
+                  <th style={{ minWidth: 110 }}>AVC</th>
                   <th>Restante</th><th>EG/ET</th><th>Sem.</th>
                   <th>Type exam</th><th>EFM</th><th>Rég.</th>
                 </tr>

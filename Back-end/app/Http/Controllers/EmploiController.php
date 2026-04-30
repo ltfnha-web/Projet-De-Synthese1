@@ -74,12 +74,14 @@ class EmploiController extends Controller
         try {
             $emploi = DB::transaction(function () use ($request, $seances) {
                 $emploi = EmploiDuTemps::create([
-                    'groupe_id'     => $request->groupe_id,
-                    'created_by'    => $request->user()->id,
-                    'periode_debut' => $request->date_debut,
-                    'semestre'      => $request->semestre,
-                    'grille'        => $request->grille,
-                    'valide'        => false,
+                    'groupe_id'        => $request->groupe_id,
+                    'created_by'       => $request->user()->id,
+                    'periode_debut'    => $request->date_debut,
+                    'semestre'         => $request->semestre,
+                    'grille'           => $request->grille,
+                    'valide'           => false,
+                    'formateur_parrain'=> $request->formateur_parrain,
+                    'signataire_nom'   => $request->signataire_nom,
                 ]);
 
                 foreach ($seances as $s) {
@@ -195,6 +197,7 @@ class EmploiController extends Controller
                 'jours'        => $emploi->grille,
                 'nb_heures'    => $emploi->nb_heures ?? null,
                 'formateur_parrain' => $emploi->formateur_parrain ?? null,
+                'signataire_nom'    => $emploi->signataire_nom ?? null,
             ]
         ]);
     }
@@ -232,9 +235,11 @@ class EmploiController extends Controller
                 DB::transaction(function () use ($emploi, $request, $seances, $semestre) {
                     $emploi->seances()->delete();
                     $emploi->update([
-                        'grille'   => $request->grille,
-                        'semestre' => $semestre,
-                        'valide'   => $request->valide ?? $emploi->valide,
+                        'grille'            => $request->grille,
+                        'semestre'          => $semestre,
+                        'valide'            => $request->valide ?? $emploi->valide,
+                        'formateur_parrain' => $request->formateur_parrain ?? $emploi->formateur_parrain,
+                        'signataire_nom'    => $request->signataire_nom    ?? $emploi->signataire_nom,
                     ]);
                     foreach ($seances as $s) {
                         EmploiSeance::create(['emploi_id' => $emploi->id] + $s);
@@ -249,7 +254,7 @@ class EmploiController extends Controller
                 throw $e;
             }
         } else {
-            $emploi->update($request->only(['valide', 'periode_debut']));
+            $emploi->update($request->only(['valide', 'periode_debut', 'formateur_parrain', 'signataire_nom']));
         }
 
         return response()->json(['data' => $emploi->fresh()]);

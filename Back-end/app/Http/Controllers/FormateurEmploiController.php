@@ -61,10 +61,11 @@ class FormateurEmploiController extends Controller
         });
 
         $record = FormateurEmploi::create([
-            'formateur_id' => $formateur->id,
-            'created_by'   => $request->user()->id,
-            'semestre'     => $request->semestre,
-            'grille'       => $grille,
+            'formateur_id'  => $formateur->id,
+            'created_by'    => $request->user()->id,
+            'semestre'      => $request->semestre,
+            'grille'        => $grille,
+            'signataire_nom'=> $request->signataire_nom,
         ]);
 
         return response()->json(['message' => "Emploi de {$formateur->nom} sauvegardé."], 201);
@@ -73,7 +74,15 @@ class FormateurEmploiController extends Controller
     public function show($id)
     {
         $record = FormateurEmploi::with('formateur')->findOrFail($id);
-        return response()->json(['data' => $record]);
+        return response()->json(['data' => [
+            'id'            => $record->id,
+            'formateur_id'  => $record->formateur_id,
+            'formateur'     => $record->formateur?->nom ?? '—',
+            'semestre'      => $record->semestre,
+            'grille'        => $record->grille,
+            'signataire_nom'=> $record->signataire_nom,
+            'created_at'    => $record->created_at?->format('d/m/Y'),
+        ]]);
     }
 
     public function destroy($id)

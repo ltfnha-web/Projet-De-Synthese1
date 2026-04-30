@@ -8,7 +8,7 @@ class FormateurEmploi extends Model
 {
     protected $table = 'formateur_emplois';
 
-    protected $fillable = ['formateur_id', 'created_by', 'semestre', 'grille'];
+    protected $fillable = ['formateur_id', 'created_by', 'semestre', 'grille', 'signataire_nom'];
 
     protected $casts = ['grille' => 'array'];
 

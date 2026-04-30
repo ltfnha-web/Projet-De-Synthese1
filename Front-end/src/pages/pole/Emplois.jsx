@@ -43,394 +43,345 @@ function calcNbHeures(jours) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   DOCUMENT OFPPT — tailles compactes pour tenir sur 1 feuille
+   Helpers partagés entre les deux documents
 ═══════════════════════════════════════════════════════════════ */
-function DocumentOFPPT({ emploi }) {
-  if (!emploi) return null;
+const NAVY = "#1a3a5f";
+const FF   = "Arial, Helvetica, sans-serif";
+const TBL_BASE = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
 
-  const heuresHebdo = emploi.nb_heures ?? calcNbHeures(emploi.jours);
-  const heuresAnnee = heuresHebdo * 23;
+function isEGTS(module) { return /egts/i.test(toStr(module)); }
+function cellAcc(s) {
+  return isEGTS(s?.module)
+    ? { bg: "#fff3e0", accent: "#e65100" }
+    : { bg: "#e8f0fe", accent: "#1565c0" };
+}
+function td(extra = {}) {
+  return { border: "1px solid #bbb", padding: "3px 6px", fontSize: 8.5,
+           fontFamily: FF, color: "#000", verticalAlign: "middle", ...extra };
+}
 
-  const TD = {
-    border: "1px solid #000",
-    padding: "2px 5px",
-    verticalAlign: "top",
-    color: "#000",
-    background: "#fff",
-    fontSize: 9,
-    fontFamily: "Arial, Helvetica, sans-serif",
-  };
-
-  const TBL = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
-
+/* Barre marine commune ─────────────────────────────────────── */
+function DocHeader({ title }) {
   return (
-    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: 9, color: "#000", background: "#fff", padding: "6px 8px", boxSizing: "border-box", width: "100%" }}>
+    <div style={{ background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 10px" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: 0.5, fontFamily: FF }}>{title}</div>
+        <div style={{ fontSize: 8, color: "rgba(255,255,255,.6)", marginTop: 2, fontFamily: FF }}>
+          Année de Formation 2025–2026 &nbsp;|&nbsp; CF SALÉ I
+        </div>
+      </div>
+    </div>
+  );
+}
 
-      {/* ══ 1. EN-TÊTE ══════════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "14%" }} /><col style={{ width: "56%" }} /><col style={{ width: "30%" }} /></colgroup>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "4px 6px" }}>
-              <div style={{ fontWeight: 700, fontSize: 12 }}>OFPPT</div>
-              <div style={{ fontSize: 7.5, direction: "rtl", lineHeight: 1.5 }}>مكتب التكوين المهني وإنعاش الشغل</div>
-              <div style={{ fontSize: 7, color: "#555", direction: "rtl" }}>المملكة المغربية</div>
-              <div style={{ marginTop: 2, fontWeight: 700, fontSize: 9 }}>CF SALE I</div>
-            </td>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "5px 10px" }}>
-              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2, color: "#000" }}>EMPLOI DU TEMPS</div>
-              <div style={{ fontSize: 9, direction: "rtl", fontFamily: "serif", color: "#333", margin: "2px 0" }}>جدول التوقيت الأسبوعي</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#000" }}>Année de Formation 2025-2026</div>
-            </td>
-            <td style={{ ...TD, textAlign: "right", verticalAlign: "middle", padding: "4px 8px" }}>
-              <div style={{ direction: "rtl", fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-                <div style={{ fontWeight: 700 }}>مكتب التكوين المهني والتقني</div>
-                <div>Office de la Formation Professionnelle</div>
-                <div>et de la Promotion du Travail</div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+/* Grille horaire commune ───────────────────────────────────── */
+const SLOT_TIMES = [["08:30","11:00"],["11:00","13:30"],["13:30","16:00"],["16:00","18:30"]];
 
-      {/* ══ 2. EFP ══════════════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, padding: "2px 6px" }}>
-              <span style={{ fontWeight: 700 }}>EFP : </span>ISTA HAY SALAM SALE
-              <span style={{ float: "right", fontWeight: 700, textDecoration: "underline" }}>Version 1</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ══ 3. BANDEAU CYAN ═════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <tbody>
-          <tr>
-            <td style={{ border: "1px solid #000", padding: "3px 8px", background: "#00bcd4", textAlign: "center", fontWeight: 900, fontSize: 11, color: "#000" }}>
-              Période d'application : A partir du {toStr(emploi.periodeDebut ?? emploi.periode_debut ?? "—")}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ══ 4. FILIÈRE / NIVEAUX ════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "50%" }} /><col style={{ width: "50%" }} /></colgroup>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, padding: "3px 6px" }}>
-              <table style={{ borderCollapse: "collapse", fontSize: 9 }}>
-                <tbody>
-                  {[
-                    ["Filière :", toStr(emploi.filiere ?? "—")],
-                    ["Année :", toStr(emploi.annee ?? "—")],
-                    ["Groupe :", <strong key="g">{toStr(emploi.groupe)}</strong>],
-                    ["Formateur Parrain du Groupe :", toStr(emploi.formateur_parrain ?? "")],
-                  ].map(([k, v], i) => (
-                    <tr key={i}>
-                      <td style={{ paddingRight: 5, fontWeight: 700, whiteSpace: "nowrap", verticalAlign: "top", lineHeight: 1.65, color: "#000" }}>{k}</td>
-                      <td style={{ lineHeight: 1.65, color: "#000" }}>{v}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </td>
-            <td style={{ ...TD, padding: "3px 8px" }}>
-              <div style={{ display: "flex", gap: 18, marginBottom: 3 }}>
-                <div>
-                  {NIVEAUX_COL1.map(n => (
-                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 4, lineHeight: 1.65, fontSize: 9, color: "#000" }}>
-                      <div style={{ width: 9, height: 9, border: "1px solid #000", flexShrink: 0, background: "#fff" }} />{n}
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  {NIVEAUX_COL2.map(n => (
-                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 4, lineHeight: 1.65, fontSize: 9, color: "#000" }}>
-                      <div style={{ width: 9, height: 9, border: "1px solid #000", flexShrink: 0, background: "#fff" }} />{n}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div style={{ textAlign: "right", fontSize: 9, color: "#000" }}>
-                <span style={{ fontWeight: 700 }}>Nombre d'heures : </span>
-                <strong style={{ fontSize: 11 }}>{heuresHebdo} heures / sem</strong>
-                <div style={{ fontSize: 8.5, color: "#555", marginTop: 1 }}>Soit <strong>{heuresAnnee}h</strong> / an (23 sem)</div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ══ 5. GRILLE HORAIRE ═══════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <colgroup>
-          <col style={{ width: "7%" }} />
-          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
-          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, verticalAlign: "middle", padding: "2px 3px" }}>
-              <div style={{ color: "#000", fontSize: 8.5 }}>Séances</div>
-              <div style={{ color: "#000", fontSize: 8.5 }}>Jours</div>
+function DocGrid({ jours, renderCell }) {
+  return (
+    <table style={{ ...TBL_BASE, marginTop: 1 }}>
+      <colgroup>
+        <col style={{ width: "9%" }} />
+        {SLOT_TIMES.map((_, i) => <col key={i} style={{ width: "22.75%" }} />)}
+      </colgroup>
+      <thead>
+        <tr>
+          <th style={td({ background: NAVY, color: "#fff", textAlign: "center", fontSize: 8, fontWeight: 700, padding: "4px 2px" })}>
+            Jour /<br />Séance
+          </th>
+          {SLOT_TIMES.map(([a, b], i) => (
+            <th key={i} style={td({ background: NAVY, color: "#fff", textAlign: "center", fontWeight: 700, fontSize: 10, padding: "4px 6px" })}>
+              {a} {b}
             </th>
-            {SEANCES.map((s, i) => (
-              <th key={i} style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, padding: "2px 4px" }}>
-                <div style={{ color: "#000", fontSize: 9 }}>{s.label}</div>
-                <div style={{ color: "#000", fontWeight: 400, fontSize: 8.5 }}>{s.horaire}</div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {JOURS.map((jour) => {
-            const seances = Array.isArray(emploi.jours?.[jour]) ? emploi.jours[jour] : [null, null, null, null];
-            return (
-              <tr key={jour}>
-                <td style={{ ...TD, fontWeight: 700, fontSize: 9, textAlign: "center", verticalAlign: "middle", background: "#fafafa", color: "#000", padding: "2px 3px" }}>
-                  {jour}
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {JOURS.map(jour => (
+          <tr key={jour}>
+            <td style={td({ background: NAVY, color: "#fff", fontWeight: 700, textAlign: "center", fontSize: 9, padding: "3px 2px" })}>
+              {jour}
+            </td>
+            {(Array.isArray(jours?.[jour]) ? jours[jour] : [null,null,null,null]).map((s, i) => {
+              if (!s?.module) return (
+                <td key={i} style={td({ textAlign: "center", color: "#aaa", fontSize: 15, background: "#fff", padding: "2px" })}>—</td>
+              );
+              const cc = cellAcc(s);
+              return (
+                <td key={i} style={td({ background: cc.bg, textAlign: "center", verticalAlign: "middle", padding: "4px 5px", border: "1px solid #ddd" })}>
+                  {renderCell(s, cc)}
                 </td>
-                {seances.map((s, i) => {
-                  if (!s || !s.module) {
-                    return <td key={i} style={{ ...TD, background: "#fff", padding: "2px 4px" }}><div style={{ minHeight: 32 }} /></td>;
-                  }
-                  return (
-                    <td key={i} style={{ ...TD, background: "#fff", verticalAlign: "top", padding: "2px 4px" }}>
-                      <div style={{ fontSize: 8, color: "#444", marginBottom: 1 }}>{SEANCES[i].horaire}</div>
-                      <div style={{ fontWeight: 700, fontSize: 9, color: "#000", lineHeight: 1.25, marginBottom: 1 }}>{toStr(s.module)}</div>
-                      <div style={{ fontSize: 8.5, color: "#000", marginBottom: 1 }}>{toStr(s.formateur)}</div>
-                      <div style={{ fontSize: 8, color: "#000" }}>
-                        {s.mode === "DISTANCIEL" ? "Formation à distance" : `Présentiel${s.salle ? ` / ${s.salle}` : ""}`}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      {/* ══ 6. PIED DE PAGE ═════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "35%" }} /><col style={{ width: "35%" }} /><col style={{ width: "30%" }} /></colgroup>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, verticalAlign: "top", padding: "3px 6px" }}>
-              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 2, fontSize: 9, color: "#000" }}>Emargements :</div>
-              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-                <div>Fait à Salé</div>
-                <div>Date : {toStr(emploi.periodeDebut ?? emploi.periode_debut ?? "—")}</div>
-              </div>
-              <div style={{ height: 22 }} />
-            </td>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "top", padding: "3px 6px" }}>
-              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 3, fontSize: 9, color: "#000" }}>Le Directeur</div>
-              <div style={{ height: 22 }} />
-              <div style={{ fontSize: 8.5, color: "#0055aa", fontWeight: 700, lineHeight: 1.7 }}>
-                <div>KADDOURI HICHAM</div>
-                <div>DIRECTEUR D'ETABLISSEMENT</div>
-                <div>ISTA HAY SALAM SALE</div>
-              </div>
-            </td>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "3px 6px" }}>
-              <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 3, color: "#000" }}>DRRSK</div>
-              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-                <div>ISTA Hay Salam - CF SALE 1</div>
-                <div>Abd ABDELKRIM KHATABI</div>
-                <div>Hay Salam - Salé</div>
-              </div>
-            </td>
+              );
+            })}
           </tr>
-        </tbody>
-      </table>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
+/* Barre de légende commune ─────────────────────────────────── */
+function DocLegend() {
+  return (
+    <div style={{ display: "flex", gap: 20, padding: "3px 8px", borderTop: "1px solid #ddd", fontSize: 7.5, fontFamily: FF, color: "#333" }}>
+      <span><span style={{ color: "#1565c0", fontWeight: 700 }}>■</span> Modules techniques</span>
+      <span><span style={{ color: "#e65100", fontWeight: 700 }}>■</span> EGTS — Modules transversaux</span>
+      <span>■ FAD — Formation à distance</span>
+      <span>■ Prés. — Formation en présentiel</span>
+    </div>
+  );
+}
+
+/* Pied de page commun ──────────────────────────────────────── */
+function DocBottomBar({ label }) {
+  return (
+    <div style={{ background: NAVY, display: "flex", justifyContent: "space-between", padding: "3px 8px", marginTop: 1 }}>
+      <span style={{ fontSize: 7, color: "rgba(255,255,255,.75)", fontFamily: FF }}>
+        OFPPT — Office de la Formation Professionnelle et de la Promotion du Travail
+      </span>
+      <span style={{ fontSize: 7, color: "rgba(255,255,255,.75)", fontFamily: FF }}>
+        Version 1 — {label} • Année de Formation 2025-2026
+      </span>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   DOCUMENT OFPPT — version FORMATEUR
-   Même en-tête, bandeau cyan, grille et pied de page.
-   Section info simplifiée : Formateur / Année / Date.
+   DOCUMENT OFPPT — Emploi du Temps GROUPE
 ═══════════════════════════════════════════════════════════════ */
-function DocumentFormateurOFPPT({ nom, annee, semestre, periodeDebut, grille }) {
-  const TD = {
-    border: "1px solid #000",
-    padding: "2px 5px",
-    verticalAlign: "top",
-    color: "#000",
-    background: "#fff",
-    fontSize: 9,
-    fontFamily: "Arial, Helvetica, sans-serif",
-  };
-  const TBL = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
+function DocumentOFPPT({ emploi }) {
+  if (!emploi) return null;
+  const heuresHebdo = emploi.nb_heures ?? calcNbHeures(emploi.jours);
+  const periode = toStr(emploi.periodeDebut ?? emploi.periode_debut ?? "—");
 
   return (
-    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: 9, color: "#000", background: "#fff", padding: "6px 8px", boxSizing: "border-box", width: "100%" }}>
+    <div style={{ fontFamily: FF, fontSize: 9, color: "#000", background: "#fff", width: "100%" }}>
 
-      {/* ══ 1. EN-TÊTE ══════════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "14%" }} /><col style={{ width: "56%" }} /><col style={{ width: "30%" }} /></colgroup>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "4px 6px" }}>
-              <div style={{ fontWeight: 700, fontSize: 12 }}>OFPPT</div>
-              <div style={{ fontSize: 7.5, direction: "rtl", lineHeight: 1.5 }}>مكتب التكوين المهني وإنعاش الشغل</div>
-              <div style={{ fontSize: 7, color: "#555", direction: "rtl" }}>المملكة المغربية</div>
-              <div style={{ marginTop: 2, fontWeight: 700, fontSize: 9 }}>CF SALE I</div>
-            </td>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "5px 10px" }}>
-              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2, color: "#000" }}>EMPLOI DU TEMPS</div>
-              <div style={{ fontSize: 9, direction: "rtl", fontFamily: "serif", color: "#333", margin: "2px 0" }}>جدول التوقيت الأسبوعي</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#000" }}>Année de Formation {annee ?? "2025-2026"}</div>
-            </td>
-            <td style={{ ...TD, textAlign: "right", verticalAlign: "middle", padding: "4px 8px" }}>
-              <div style={{ direction: "rtl", fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-                <div style={{ fontWeight: 700 }}>مكتب التكوين المهني والتقني</div>
-                <div>Office de la Formation Professionnelle</div>
-                <div>et de la Promotion du Travail</div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <DocHeader title="EMPLOI DU TEMPS" />
 
-      {/* ══ 2. EFP ══════════════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, padding: "2px 6px" }}>
-              <span style={{ fontWeight: 700 }}>EFP : </span>ISTA HAY SALAM SALE
-              <span style={{ float: "right", fontWeight: 700, textDecoration: "underline" }}>Version 1</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ══ 3. BANDEAU CYAN ═════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <tbody>
-          <tr>
-            <td style={{ border: "1px solid #000", padding: "3px 8px", background: "#00bcd4", textAlign: "center", fontWeight: 900, fontSize: 11, color: "#000" }}>
-              Période d'application : A partir du {periodeDebut ?? "—"}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ══ 4. INFOS FORMATEUR ══════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <tbody>
-          <tr>
-            <td style={{ ...TD, padding: "6px 10px" }}>
-              <table style={{ borderCollapse: "collapse", fontSize: 10 }}>
-                <tbody>
-                  {[
-                    ["Formateur :",          <strong key="f" style={{ fontSize: 11 }}>{nom ?? "—"}</strong>],
-                    ["Année de Formation :", annee ?? "2025-2026"],
-                    ["Semestre :",           semestre ?? "—"],
-                  ].map(([k, v], i) => (
-                    <tr key={i}>
-                      <td style={{ paddingRight: 10, fontWeight: 700, whiteSpace: "nowrap", verticalAlign: "middle", lineHeight: 2, color: "#000" }}>{k}</td>
-                      <td style={{ lineHeight: 2, color: "#000" }}>{v}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ══ 5. GRILLE HORAIRE ═══════════════════════════════════════════════ */}
-      <table style={TBL}>
+      {/* Info table */}
+      <table style={{ ...TBL_BASE, border: "1px solid #aaa" }}>
         <colgroup>
-          <col style={{ width: "7%" }} />
-          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
-          <col style={{ width: "23.25%" }} /><col style={{ width: "23.25%" }} />
+          <col style={{ width: "8%" }} /><col style={{ width: "17%" }} />
+          <col style={{ width: "9%" }} /><col style={{ width: "31%" }} />
+          <col style={{ width: "12%" }} /><col style={{ width: "23%" }} />
+        </colgroup>
+        <tbody>
+          <tr>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>EFP :</td>
+            <td style={td({ fontWeight: 700 })}>ISTA HAY SALAM SALÉ</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Filière :</td>
+            <td style={td()}>{toStr(emploi.filiere ?? "—")}</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Version :</td>
+            <td style={td({ fontWeight: 700 })}>1</td>
+          </tr>
+          <tr>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>CF :</td>
+            <td style={td({ fontWeight: 700 })}>CF SALÉ I</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Année :</td>
+            <td style={td()}>
+              {toStr(emploi.annee ?? "—")} &nbsp;—&nbsp; Groupe : <strong>{toStr(emploi.groupe)}</strong>
+            </td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Période :</td>
+            <td style={td()}>À partir du {periode}</td>
+          </tr>
+          <tr>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Niveau :</td>
+            <td style={td()}>{toStr(emploi.niveau ?? "Technicien Spécialisé")}</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700, fontSize: 8 })}>Formateur Parrain :</td>
+            <td style={td()}>{toStr(emploi.formateur_parrain) || "______________________"}</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700, fontSize: 8 })}>Nb. heures / sem. :</td>
+            <td style={td({ fontWeight: 700 })}>{heuresHebdo} heures</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <DocGrid
+        jours={emploi.jours}
+        renderCell={(s, cc) => (
+          <>
+            <div style={{ fontWeight: 800, fontSize: 9, color: cc.accent, lineHeight: 1.35 }}>{toStr(s.module)}</div>
+            {s.intitule && <div style={{ fontWeight: 700, fontSize: 8.5, color: cc.accent, lineHeight: 1.3 }}>{toStr(s.intitule)}</div>}
+            <div style={{ fontSize: 8, color: "#555", lineHeight: 1.5 }}>{toStr(s.formateur)}</div>
+            <div style={{ fontSize: 8, color: "#333", lineHeight: 1.3 }}>■ {s.salle || "—"} • {s.mode === "DISTANCIEL" ? "FAD" : "Présentiel"}</div>
+          </>
+        )}
+      />
+
+      <DocLegend />
+
+      {/* Footer */}
+      <table style={{ ...TBL_BASE, marginTop: 1, border: "1px solid #bbb" }}>
+        <colgroup><col style={{ width: "55%" }} /><col style={{ width: "45%" }} /></colgroup>
+        <tbody>
+          <tr>
+            <td style={td({ padding: "6px 10px", verticalAlign: "top" })}>
+              <div style={{ fontSize: 8.5 }}>Nom &amp; Prénom : <span style={{ borderBottom: "1px solid #000", minWidth: 160, display: "inline-block", paddingBottom: 1 }}>{toStr(emploi.signataire_nom)}</span></div>
+              <div style={{ fontSize: 8.5, marginTop: 10 }}>Signature :</div>
+            </td>
+            <td style={td({ padding: "6px 10px", fontWeight: 700, verticalAlign: "top" })}>
+              <div>KADDOURI HICHAM</div>
+              <div style={{ fontWeight: 400, fontSize: 8, marginTop: 2 }}>Directeur d'Établissement ISTA HAY SALAM SALÉ</div>
+              <div style={{ fontWeight: 400, fontSize: 8, marginTop: 3 }}>Fait à Salé — Le : {periode}</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <DocBottomBar label="EMPLOI DU TEMPS GROUPE" />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOCUMENT OFPPT — Emploi du Temps FORMATEUR
+═══════════════════════════════════════════════════════════════ */
+function DocumentFormateurOFPPT({ nom, annee, semestre, periodeDebut, grille, signataire }) {
+  const THRESH = 26;
+
+  // Récapitulatif
+  const recapMap = {};
+  JOURS.forEach(jour => {
+    (grille?.[jour] ?? []).forEach(s => {
+      if (!s?.module) return;
+      const key = toStr(s.module);
+      if (!recapMap[key]) recapMap[key] = { module: key, count: 0 };
+      recapMap[key].count++;
+    });
+  });
+  const recapRows = Object.values(recapMap).map(r => ({ ...r, hours: r.count * 2.5 }));
+  const totalH    = recapRows.reduce((s, r) => s + r.hours, 0);
+  const totalHSup = Math.max(0, totalH - THRESH);
+
+  let cumul = 0;
+  const recap = recapRows.map(r => {
+    const statut = cumul >= THRESH ? "H. Sup." : "Statutaire";
+    cumul += r.hours;
+    return { ...r, statut };
+  });
+
+  const fmtH = (h) => (h % 1 === 0 ? h : h.toFixed(1)) + " h";
+
+  return (
+    <div style={{ fontFamily: FF, fontSize: 9, color: "#000", background: "#fff", width: "100%" }}>
+
+      <DocHeader title="EMPLOI DU TEMPS" />
+
+      {/* Info table */}
+      <table style={{ ...TBL_BASE, border: "1px solid #aaa" }}>
+        <colgroup>
+          <col style={{ width: "8%" }} /><col style={{ width: "17%" }} />
+          <col style={{ width: "9%" }} /><col style={{ width: "31%" }} />
+          <col style={{ width: "12%" }} /><col style={{ width: "23%" }} />
+        </colgroup>
+        <tbody>
+          <tr>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>EFP :</td>
+            <td style={td({ fontWeight: 700 })}>ISTA HAY SALAM SALÉ</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Formateur :</td>
+            <td style={td({ fontWeight: 700 })}>Mr {toStr(nom ?? "—")}</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Matricule :</td>
+            <td style={td({ fontWeight: 700 })}>—</td>
+          </tr>
+          <tr>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>CF :</td>
+            <td style={td({ fontWeight: 700 })}>CF SALÉ I</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Statut :</td>
+            <td style={td({ fontSize: 8 })}>■ Statutaire &nbsp;■ Vacataire &nbsp;■ Coopérant &nbsp;■ Contrat de Service</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700, fontSize: 8 })}>Masse horaire :</td>
+            <td style={td({ fontWeight: 700 })}>{totalH > 0 ? fmtH(totalH) + " / sem." : "— h / sem."}</td>
+          </tr>
+          <tr>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Version :</td>
+            <td style={td({ fontWeight: 700 })}>1</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700 })}>Période :</td>
+            <td style={td()}>À partir du {periodeDebut ?? "—"}</td>
+            <td style={td({ background: "#f0f0f0", fontWeight: 700, fontSize: 8 })}>dont H.Sup. :</td>
+            <td style={td({ fontWeight: 700, color: totalHSup > 0 ? "#e65100" : "#000" })}>
+              {totalHSup > 0 ? fmtH(totalHSup) : "—"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <DocGrid
+        jours={grille}
+        renderCell={(s, cc) => (
+          <>
+            <div style={{ fontWeight: 800, fontSize: 9, color: cc.accent, lineHeight: 1.35 }}>{toStr(s.module)}</div>
+            {s.intitule && <div style={{ fontWeight: 700, fontSize: 8.5, color: cc.accent, lineHeight: 1.3 }}>{toStr(s.intitule)}</div>}
+            <div style={{ fontSize: 8, color: "#333", lineHeight: 1.5 }}>■ {toStr(s.groupe)}</div>
+            <div style={{ fontSize: 8, color: "#333", lineHeight: 1.3 }}>■ {s.salle || "—"} • {s.mode === "DISTANCIEL" ? "FAD" : "Présentiel"}</div>
+          </>
+        )}
+      />
+
+      {/* Récapitulatif + footer */}
+      <table style={{ ...TBL_BASE, marginTop: 1, border: "1px solid #bbb" }}>
+        <colgroup>
+          <col style={{ width: "38%" }} /><col style={{ width: "31%" }} /><col style={{ width: "31%" }} />
         </colgroup>
         <thead>
           <tr>
-            <th style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, verticalAlign: "middle", padding: "2px 3px" }}>
-              <div style={{ color: "#000", fontSize: 8.5 }}>Séances</div>
-              <div style={{ color: "#000", fontSize: 8.5 }}>Jours</div>
-            </th>
-            {SEANCES.map((s, i) => (
-              <th key={i} style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, padding: "2px 4px" }}>
-                <div style={{ color: "#000", fontSize: 9 }}>{s.label}</div>
-                <div style={{ color: "#000", fontWeight: 400, fontSize: 8.5 }}>{s.horaire}</div>
-              </th>
-            ))}
+            <th style={td({ background: "#e8eef8", fontWeight: 700, textAlign: "center", padding: "3px 6px" })}>RÉCAPITULATIF VOLUME HORAIRE</th>
+            <th style={td({ background: "#e8eef8", fontWeight: 700, textAlign: "center", padding: "3px 6px" })}>Le Formateur</th>
+            <th style={td({ background: "#e8eef8", fontWeight: 700, textAlign: "center", padding: "3px 6px" })}>Le Directeur d'Établissement</th>
           </tr>
         </thead>
         <tbody>
-          {JOURS.map((jour) => {
-            const seances = Array.isArray(grille?.[jour]) ? grille[jour] : [null, null, null, null];
-            return (
-              <tr key={jour}>
-                <td style={{ ...TD, fontWeight: 700, fontSize: 9, textAlign: "center", verticalAlign: "middle", background: "#fafafa", color: "#000", padding: "2px 3px" }}>
-                  {jour}
-                </td>
-                {seances.map((s, i) => {
-                  if (!s || !s.module) {
-                    return <td key={i} style={{ ...TD, background: "#fff", padding: "2px 4px" }}><div style={{ minHeight: 32 }} /></td>;
-                  }
-                  return (
-                    <td key={i} style={{ ...TD, background: "#fff", verticalAlign: "top", padding: "2px 4px" }}>
-                      <div style={{ fontSize: 8, color: "#444", marginBottom: 1 }}>{SEANCES[i].horaire}</div>
-                      <div style={{ fontWeight: 700, fontSize: 9, color: "#000", lineHeight: 1.25, marginBottom: 1 }}>{toStr(s.module)}</div>
-                      <div style={{ fontSize: 8.5, color: "#555", marginBottom: 1 }}>Grp. {toStr(s.groupe)}</div>
-                      <div style={{ fontSize: 8, color: "#000" }}>
-                        {s.mode === "DISTANCIEL" ? "Formation à distance" : `Présentiel${s.salle ? ` / ${s.salle}` : ""}`}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      {/* ══ 6. PIED DE PAGE ═════════════════════════════════════════════════ */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "35%" }} /><col style={{ width: "35%" }} /><col style={{ width: "30%" }} /></colgroup>
-        <tbody>
           <tr>
-            <td style={{ ...TD, verticalAlign: "top", padding: "3px 6px" }}>
-              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 2, fontSize: 9, color: "#000" }}>Emargements :</div>
-              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-                <div>Fait à Salé</div>
-                <div>Date : {periodeDebut ?? "—"}</div>
-              </div>
-              <div style={{ height: 22 }} />
+            {/* Recap sub-table */}
+            <td style={{ ...td({ padding: 0, verticalAlign: "top" }) }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 8.5, fontFamily: FF }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: "2px 5px", background: "#f5f7fb", fontWeight: 700, borderBottom: "1px solid #bbb", borderRight: "1px solid #ddd", textAlign: "left" }}>Module</th>
+                    <th style={{ padding: "2px 5px", background: "#f5f7fb", fontWeight: 700, borderBottom: "1px solid #bbb", borderRight: "1px solid #ddd", textAlign: "center", width: "18%" }}>H/sem.</th>
+                    <th style={{ padding: "2px 5px", background: "#f5f7fb", fontWeight: 700, borderBottom: "1px solid #bbb", textAlign: "center", width: "22%" }}>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recap.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "2px 5px", borderRight: "1px solid #ddd" }}>{r.module}</td>
+                      <td style={{ padding: "2px 5px", textAlign: "center", fontWeight: 700, borderRight: "1px solid #ddd" }}>{fmtH(r.hours)}</td>
+                      <td style={{ padding: "2px 5px", textAlign: "center", fontWeight: r.statut === "H. Sup." ? 700 : 400, color: r.statut === "H. Sup." ? "#e65100" : "#15803d" }}>{r.statut}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ borderTop: "1px solid #999", background: "#f5f5f5" }}>
+                    <td style={{ padding: "3px 5px", fontWeight: 800, borderRight: "1px solid #ddd" }}>TOTAL</td>
+                    <td style={{ padding: "3px 5px", textAlign: "center", fontWeight: 800, borderRight: "1px solid #ddd" }}>{fmtH(totalH)}</td>
+                    <td style={{ padding: "3px 5px", textAlign: "center", fontWeight: 700, color: totalHSup > 0 ? "#e65100" : "#15803d" }}>
+                      {totalHSup > 0 ? `dont ${fmtH(totalHSup)} H.Sup.` : "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </td>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "top", padding: "3px 6px" }}>
-              <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 3, fontSize: 9, color: "#000" }}>Le Directeur</div>
-              <div style={{ height: 22 }} />
-              <div style={{ fontSize: 8.5, color: "#0055aa", fontWeight: 700, lineHeight: 1.7 }}>
-                <div>KADDOURI HICHAM</div>
-                <div>DIRECTEUR D'ETABLISSEMENT</div>
-                <div>ISTA HAY SALAM SALE</div>
+            {/* Formateur section */}
+            <td style={td({ verticalAlign: "top", padding: "8px 10px" })}>
+              <div style={{ fontSize: 7.5, color: "#666", fontStyle: "italic", marginBottom: 6 }}>(Pour avoir reçu l'emploi du temps)</div>
+              <div style={{ fontSize: 8.5, marginBottom: 4 }}>
+                Nom &amp; Prénom :&nbsp;
+                <span style={{ borderBottom: "1px solid #000", minWidth: 130, display: "inline-block", paddingBottom: 1 }}>{signataire ?? ""}</span>
               </div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6, fontSize: 8.5, marginBottom: 10, marginTop: 10 }}>
+                <span>Date :</span><div style={{ flex: 1, borderBottom: "1px solid #000" }} />
+              </div>
+              <div style={{ fontSize: 8.5 }}>Signature :</div>
             </td>
-            <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "3px 6px" }}>
-              <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 3, color: "#000" }}>DRRSK</div>
-              <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-                <div>ISTA Hay Salam - CF SALE 1</div>
-                <div>Abd ABDELKRIM KHATABI</div>
-                <div>Hay Salam - Salé</div>
-              </div>
+            {/* Directeur section */}
+            <td style={td({ verticalAlign: "top", padding: "8px 10px" })}>
+              <div style={{ fontWeight: 700, fontSize: 9 }}>KADDOURI HICHAM</div>
+              <div style={{ fontSize: 8, marginTop: 2 }}>Directeur d'Établissement</div>
+              <div style={{ fontSize: 8 }}>ISTA HAY SALAM SALÉ</div>
+              <div style={{ fontSize: 8, marginTop: 6 }}>Fait à Salé — Le : {periodeDebut ?? "—"}</div>
             </td>
           </tr>
         </tbody>
       </table>
 
+      <DocBottomBar label="EMPLOI DU TEMPS FORMATEUR" />
     </div>
   );
 }
@@ -454,7 +405,7 @@ function MiniPlanningPreview({ plannings, groupeId, semestre }) {
         </thead>
         <tbody>
           {filtered.map((p, i) => {
-            const pct = p.mh_drif ? Math.min(100, ((p.total_prevu ?? 0) / p.mh_drif) * 100) : 0;
+            const pct = p.mh_drif ? Math.min(100, p.avce ?? (((p.mh_realisee_module ?? 0) / p.mh_drif) * 100)) : 0;
             const bc = pct >= 90 ? "#7c3aed" : pct >= 60 ? "#0891b2" : pct >= 30 ? "#d97706" : "#dc2626";
             return (
               <tr key={p.id} style={{ borderBottom: "1px solid var(--sp-border)", background: i % 2 === 0 ? "#fff" : "var(--sp-gray-100)" }}>
@@ -493,6 +444,7 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState(null);
   const [saved, setSaved]             = useState(false);
+  const [signataire, setSignataire]   = useState("");
 
   const generate = async () => {
     if (!formateurId) return;
@@ -511,7 +463,7 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
     if (!formateurId || !grille) return;
     setSaving(true); setError(null);
     try {
-      await axios.post("/formateur-emplois", { formateur_id: formateurId, semestre });
+      await axios.post("/formateur-emplois", { formateur_id: formateurId, semestre, signataire_nom: signataire || null });
       setSaved(true);
       onSaved?.();
     } catch {
@@ -530,7 +482,7 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
 <html><head><meta charset="UTF-8"/>
 <title>Emploi du temps — ${formateurNom}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
   @page { size: A4 landscape; margin: 5mm; }
   @media print {
@@ -570,6 +522,12 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
               <select className="sp-form-control" value={semestre} onChange={e => setSemestre(e.target.value)}>
                 <option>S1</option><option>S2</option>
               </select>
+            </div>
+            <div className="sp-form-group" style={{ flex: 1, minWidth: 200 }}>
+              <label className="sp-form-label">
+                Signataire — Nom &amp; Prénom&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
+              </label>
+              <input type="text" className="sp-form-control" placeholder="Nom & Prénom du signataire…" value={signataire} onChange={e => setSignataire(e.target.value)} />
             </div>
             <button className="sp-btn sp-btn--primary" onClick={generate} disabled={!formateurId || loading}>
               {loading ? "Génération…" : <>{Ico.cal} Générer</>}
@@ -615,8 +573,8 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
                         if (!cell) return <td key={si} style={{ padding: "10px 12px", textAlign: "center", color: "var(--sp-gray-400)", border: "1px solid var(--sp-border)" }}>—</td>;
                         return (
                           <td key={si} style={{ padding: "8px 12px", verticalAlign: "top", border: "1px solid var(--sp-border)" }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{cell.module}</div>
-                            <div style={{ fontSize: 11, color: "var(--sp-green)", marginBottom: 2 }}>Groupe {cell.groupe}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{toStr(cell.module)}</div>
+                            <div style={{ fontSize: 11, color: "var(--sp-green)", marginBottom: 2 }}>Groupe {toStr(cell.groupe)}</div>
                             <div style={{ fontSize: 10, color: "var(--sp-gray-600)" }}>{cell.salle || ""} {cell.mode === "DISTANCIEL" ? "DIST." : "PRÉS."}</div>
                           </td>
                         );
@@ -637,6 +595,7 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
                 semestre={semestre}
                 periodeDebut={new Date().toLocaleDateString("fr-FR")}
                 grille={grille}
+                signataire={signataire}
               />
             </div>
           )}
@@ -650,7 +609,7 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
    MODAL CRÉER EMPLOI
 ═══════════════════════════════════════════════════════════════ */
 function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
-  const [form, setForm] = useState({ groupe_id: "", date_debut: new Date().toISOString().split("T")[0], semestre: "S1" });
+  const [form, setForm] = useState({ groupe_id: "", date_debut: new Date().toISOString().split("T")[0], semestre: "S1", formateur_parrain: "", signataire_nom: "" });
   const [grille, setGrille] = useState(() => { const g = {}; JOURS.forEach(j => { g[j] = [null,null,null,null]; }); return g; });
   const [modules, setModules]       = useState([]);
   const [formateurs, setFormateurs] = useState([]);
@@ -707,7 +666,7 @@ function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
     setSaving(true); setError(null);
     try {
       const groupe = groupes.find(g => String(g.id) === String(form.groupe_id));
-      await axios.post("/emplois", { groupe: toStr(groupe?.nom ?? `Groupe ${form.groupe_id}`), groupe_id: Number(form.groupe_id), date_debut: form.date_debut, semestre: form.semestre, grille });
+      await axios.post("/emplois", { groupe: toStr(groupe?.nom ?? `Groupe ${form.groupe_id}`), groupe_id: Number(form.groupe_id), date_debut: form.date_debut, semestre: form.semestre, grille, formateur_parrain: form.formateur_parrain || null, signataire_nom: form.signataire_nom || null });
       onSaved();
     } catch (e) {
       setError(e.response?.data?.message || (e.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(" | ") : null) || "Erreur inconnue");
@@ -748,6 +707,24 @@ function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
               <div className="sp-form-group">
                 <label className="sp-form-label">Période début</label>
                 <input type="date" className="sp-form-control" value={form.date_debut} onChange={e => set("date_debut", e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div className="sp-form-group">
+                <label className="sp-form-label">
+                  Formateur Parrain&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
+                </label>
+                <select className="sp-form-control" value={form.formateur_parrain} onChange={e => set("formateur_parrain", e.target.value)}>
+                  <option value="">— Aucun —</option>
+                  {formateurs.map(f => <option key={f.id} value={toStr(f.nom)}>{toStr(f.nom)}</option>)}
+                </select>
+              </div>
+              <div className="sp-form-group">
+                <label className="sp-form-label">
+                  Signataire (pied de page)&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
+                </label>
+                <input type="text" className="sp-form-control" placeholder="Nom & Prénom du signataire…" value={form.signataire_nom} onChange={e => set("signataire_nom", e.target.value)} />
               </div>
             </div>
 
@@ -857,6 +834,7 @@ function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
 function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
   const grille = record.grille ?? null;
   const hasAny = grille && JOURS.some(j => (grille[j] ?? []).some(Boolean));
+  const [signataire, setSignataire] = useState(record.signataire_nom ?? "");
 
   const handlePrint = () => {
     const docEl = document.getElementById("saved-fmt-doc-content");
@@ -864,9 +842,9 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
     const win = window.open("", "_blank", "width=1200,height=850");
     win.document.write(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/>
-<title>Emploi du temps — ${record.formateur}</title>
+<title>Emploi du temps — ${toStr(record.formateur)}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
   @page { size: A4 landscape; margin: 5mm; }
   @media print {
@@ -887,7 +865,7 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
         {/* Header */}
         <div style={{ background: "var(--sp-black)", padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>{record.formateur} · {record.semestre}</div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>{toStr(record.formateur)} · {record.semestre}</div>
             <div style={{ color: "rgba(255,255,255,.45)", fontSize: 11, marginTop: 2 }}>Sauvegardé le {record.created_at}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -898,7 +876,7 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
             )}
             <button
               className="sp-btn sp-btn--secondary"
-              onClick={() => { if (window.confirm(`Supprimer l'emploi de ${record.formateur} ?`)) onDelete(record.id); }}
+              onClick={() => { if (window.confirm(`Supprimer l'emploi de ${toStr(record.formateur)} ?`)) onDelete(record.id); }}
               style={{ height: 28, padding: "0 10px", fontSize: 12, color: "#dc2626", borderColor: "#dc2626" }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -910,6 +888,12 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
 
         {/* Body */}
         <div style={{ padding: "20px 22px" }}>
+          <div className="sp-form-group" style={{ maxWidth: 380, marginBottom: 18 }}>
+            <label className="sp-form-label">
+              Signataire — Nom &amp; Prénom&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel, pour le pied de page)</span>
+            </label>
+            <input type="text" className="sp-form-control" placeholder="Nom & Prénom du signataire…" value={signataire} onChange={e => setSignataire(e.target.value)} />
+          </div>
           {!hasAny && <div style={{ textAlign: "center", padding: "40px 0", color: "var(--sp-gray-400)" }}>Aucune séance enregistrée.</div>}
           {hasAny && (
             <div style={{ overflowX: "auto" }}>
@@ -934,8 +918,8 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
                         if (!cell) return <td key={si} style={{ padding: "10px 12px", textAlign: "center", color: "var(--sp-gray-400)", border: "1px solid var(--sp-border)" }}>—</td>;
                         return (
                           <td key={si} style={{ padding: "8px 12px", verticalAlign: "top", border: "1px solid var(--sp-border)" }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{cell.module}</div>
-                            <div style={{ fontSize: 11, color: "var(--sp-green)", marginBottom: 2 }}>Groupe {cell.groupe}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{toStr(cell.module)}</div>
+                            <div style={{ fontSize: 11, color: "var(--sp-green)", marginBottom: 2 }}>Groupe {toStr(cell.groupe)}</div>
                             <div style={{ fontSize: 10, color: "var(--sp-gray-600)" }}>{cell.salle || ""} {cell.mode === "DISTANCIEL" ? "DIST." : "PRÉS."}</div>
                           </td>
                         );
@@ -951,11 +935,12 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
           {hasAny && (
             <div id="saved-fmt-doc-content" style={{ display: "none" }}>
               <DocumentFormateurOFPPT
-                nom={record.formateur}
+                nom={toStr(record.formateur)}
                 annee="2025-2026"
                 semestre={record.semestre}
                 periodeDebut={record.created_at}
                 grille={grille}
+                signataire={signataire}
               />
             </div>
           )}
@@ -980,11 +965,13 @@ function ModalModifierEmploi({ emploi, onClose, onSaved, groupes, plannings = []
     return base;
   });
 
-  const [modules, setModules]       = useState([]);
-  const [formateurs, setFormateurs] = useState([]);
-  const [availableSalles, setAvail] = useState({});
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState(null);
+  const [modules, setModules]           = useState([]);
+  const [formateurs, setFormateurs]     = useState([]);
+  const [availableSalles, setAvail]     = useState({});
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState(null);
+  const [formateurParrain, setFmtParrain] = useState(emploi?.formateur_parrain ?? "");
+  const [signataire, setSignataire]     = useState(emploi?.signataire_nom ?? "");
 
   useEffect(() => {
     axios.get("/pole-formateurs").then(({ data }) => setFormateurs(data.data ?? data ?? [])).catch(() => {});
@@ -1046,7 +1033,7 @@ function ModalModifierEmploi({ emploi, onClose, onSaved, groupes, plannings = []
   const handleSubmit = async () => {
     setSaving(true); setError(null);
     try {
-      await axios.put(`/emplois/${emploi.id}`, { grille, semestre: emploi.semestre });
+      await axios.put(`/emplois/${emploi.id}`, { grille, semestre: emploi.semestre, formateur_parrain: formateurParrain || null, signataire_nom: signataire || null });
       onSaved();
     } catch (e) {
       setError(e.response?.data?.message
@@ -1072,50 +1059,72 @@ function ModalModifierEmploi({ emploi, onClose, onSaved, groupes, plannings = []
         <div style={{ padding: "20px 22px" }}>
           {error && <div style={{ padding: "10px 14px", background: "#fee2e2", color: "#dc2626", borderRadius: 6, marginBottom: 14, fontSize: 12 }}>{error}</div>}
 
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+            <div className="sp-form-group">
+              <label className="sp-form-label">
+                Formateur Parrain&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
+              </label>
+              <select className="sp-form-control" value={formateurParrain} onChange={e => setFmtParrain(e.target.value)}>
+                <option value="">— Aucun —</option>
+                {formateurs.map(f => <option key={f.id} value={toStr(f.nom)}>{toStr(f.nom)}</option>)}
+              </select>
+            </div>
+            <div className="sp-form-group">
+              <label className="sp-form-label">
+                Signataire (pied de page)&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
+              </label>
+              <input type="text" className="sp-form-control" placeholder="Nom & Prénom du signataire…" value={signataire} onChange={e => setSignataire(e.target.value)} />
+            </div>
+          </div>
+
           {/* Grille horaire */}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
-                <tr style={{ background: "var(--sp-black)" }}>
-                  <th style={{ color: "#fff", padding: "10px 12px", border: "1px solid #333", width: 80, fontSize: 11 }}>Jour</th>
+                <tr>
+                  <th style={{ background: "#1e293b", color: "#fff", padding: "10px 14px", border: "1px solid #0f172a", width: 88, fontSize: 11, fontWeight: 700, textAlign: "left" }}>Jour</th>
                   {SEANCES.map((s, i) => (
-                    <th key={i} style={{ color: "#fff", padding: "8px 12px", textAlign: "center", border: "1px solid #333" }}>
-                      <div style={{ fontWeight: 600 }}>{s.label}</div>
-                      <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.6 }}>{s.horaire}</div>
+                    <th key={i} style={{ background: "#1e293b", color: "#fff", padding: "10px 14px", textAlign: "center", border: "1px solid #0f172a" }}>
+                      <div style={{ fontWeight: 700, fontSize: 12 }}>{s.label}</div>
+                      <div style={{ fontWeight: 400, fontSize: 10, color: "rgba(255,255,255,.55)", marginTop: 2 }}>{s.horaire}</div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {JOURS.map((jour, ji) => (
-                  <tr key={jour} style={{ background: ji % 2 === 0 ? "#fff" : "var(--sp-gray-100)" }}>
-                    <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: 12, border: "1px solid var(--sp-border)" }}>{jour}</td>
+                  <tr key={jour}>
+                    <td style={{ padding: "10px 14px", fontWeight: 800, fontSize: 12, background: "#f8fafc", border: "1px solid var(--sp-border)", color: "#1e293b", letterSpacing: .3 }}>{jour}</td>
                     {[0, 1, 2, 3].map(si => {
                       const cell = (grille[jour] ?? [])[si];
                       const list = availableSalles[jour];
+                      const hasModule = cell && toStr(cell.module);
                       return (
-                        <td key={si} style={{ padding: "6px 8px", verticalAlign: "top", border: "1px solid var(--sp-border)", minWidth: 160 }}>
+                        <td key={si} style={{ padding: 6, verticalAlign: "top", border: "1px solid var(--sp-border)", minWidth: 170, background: hasModule ? "#f0f9ff" : (ji % 2 === 0 ? "#fff" : "#f8fafc") }}>
                           {cell ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                              {/* Module */}
-                              <select style={{ ...inpSt, fontSize: 10 }} value={toStr(cell.module)} onChange={e => setCell(jour, si, "module", e.target.value)}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {hasModule && (
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", padding: "3px 7px", background: "#e0f2fe", borderRadius: 4, border: "1px solid #bae6fd", marginBottom: 2 }}>
+                                  {toStr(cell.module)}
+                                </div>
+                              )}
+                              <select style={{ ...inpSt, fontSize: 10, borderColor: hasModule ? "#7dd3fc" : "var(--sp-border)" }} value={toStr(cell.module)} onChange={e => setCell(jour, si, "module", e.target.value)}>
                                 <option value="">Module…</option>
                                 {modules.map(m => <option key={m.id} value={toStr(m.intitule ?? m.code)}>{toStr(m.code)} — {toStr(m.intitule)}</option>)}
                               </select>
-                              {/* Formateur */}
                               <select style={{ ...inpSt, fontSize: 10 }} value={toStr(cell.formateur)} onChange={e => setCell(jour, si, "formateur", e.target.value)}>
                                 <option value="">Formateur…</option>
                                 {formateurs.map(f => <option key={f.id} value={toStr(f.nom)}>{toStr(f.nom)}</option>)}
                               </select>
-                              {/* Mode */}
-                              <select style={{ ...inpSt, fontSize: 10 }} value={cell.mode ?? "PRESENTIEL"} onChange={e => setCell(jour, si, "mode", e.target.value)}>
-                                <option value="PRESENTIEL">Présentiel</option>
-                                <option value="DISTANCIEL">À distance</option>
-                              </select>
-                              {/* Salle */}
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <select style={{ ...inpSt, fontSize: 10, flex: 1 }} value={cell.mode ?? "PRESENTIEL"} onChange={e => setCell(jour, si, "mode", e.target.value)}>
+                                  <option value="PRESENTIEL">Présentiel</option>
+                                  <option value="DISTANCIEL">À distance</option>
+                                </select>
+                              </div>
                               {cell.mode !== "DISTANCIEL" && (
                                 list === undefined ? (
-                                  <input type="text" style={{ ...inpSt, fontSize: 10 }} placeholder="Salle…" value={cell.salle} onClick={() => fetchAvailableSalles(jour)} onChange={e => setCell(jour, si, "salle", e.target.value)} />
+                                  <input type="text" style={{ ...inpSt, fontSize: 10 }} placeholder="Salle (cliquer pour charger)…" value={cell.salle} onClick={() => fetchAvailableSalles(jour)} onChange={e => setCell(jour, si, "salle", e.target.value)} />
                                 ) : (
                                   <select style={{ ...inpSt, fontSize: 10 }} value={cell.salle_id ?? ""} onChange={e => setCell(jour, si, "salle_id", e.target.value)}>
                                     <option value="">Salle…</option>
@@ -1123,13 +1132,16 @@ function ModalModifierEmploi({ emploi, onClose, onSaved, groupes, plannings = []
                                   </select>
                                 )
                               )}
-                              <button type="button" onClick={() => clearCell(jour, si)} style={{ fontSize: 10, padding: "2px 6px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 4, cursor: "pointer" }}>
-                                Supprimer
+                              <button type="button" onClick={() => clearCell(jour, si)}
+                                style={{ fontSize: 10, padding: "3px 8px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 5, cursor: "pointer", fontWeight: 600 }}>
+                                × Supprimer
                               </button>
                             </div>
                           ) : (
                             <button type="button" onClick={() => addCell(jour, si)}
-                              style={{ width: "100%", padding: "18px 8px", background: "transparent", border: "2px dashed var(--sp-border)", borderRadius: 6, cursor: "pointer", color: "var(--sp-gray-400)", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center" }}
+                              style={{ width: "100%", padding: "20px 8px", background: "transparent", border: "2px dashed #cbd5e1", borderRadius: 7, cursor: "pointer", color: "#94a3b8", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
+                              onMouseOver={e => { e.currentTarget.style.borderColor = "#38bdf8"; e.currentTarget.style.color = "#0369a1"; e.currentTarget.style.background = "#f0f9ff"; }}
+                              onMouseOut={e => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.color = "#94a3b8"; e.currentTarget.style.background = "transparent"; }}
                             >+</button>
                           )}
                         </td>
@@ -1141,7 +1153,7 @@ function ModalModifierEmploi({ emploi, onClose, onSaved, groupes, plannings = []
             </table>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 14, borderTop: "1px solid var(--sp-border)", marginTop: 14 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--sp-border)", marginTop: 16 }}>
             <button className="sp-btn sp-btn--secondary" type="button" onClick={onClose}>Annuler</button>
             <button className="sp-btn sp-btn--primary" type="button" onClick={handleSubmit} disabled={saving}>
               {saving ? "Enregistrement…" : <>{Ico.check} Enregistrer les modifications</>}
@@ -1261,7 +1273,7 @@ export default function Emplois() {
   <meta charset="UTF-8"/>
   <title>Emploi du temps — ${toStr(emploiActif?.groupe ?? "")}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
 
     @page {
@@ -1270,10 +1282,7 @@ export default function Emplois() {
     }
 
     @media print {
-      /* Chrome / Edge */
       html { zoom: 0.82; }
-
-      /* Firefox fallback (@supports not zoom) */
       @supports not (zoom: 1) {
         body {
           transform: scale(0.82);
