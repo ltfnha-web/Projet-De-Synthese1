@@ -93,6 +93,44 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/pole/assign',              [PoleController::class, 'assign']);
         Route::delete('/pole/{secteur}',         [PoleController::class, 'remove']);
         Route::get('/alertes',                   [AlerteController::class, 'index']);
+
+        Route::get('/suivi-journalier', function () {
+            $jours    = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            $horaires = ['08:30–11:00', '11:00–13:30', '13:30–16:00', '16:00–18:30'];
+
+            $emplois = \App\Models\EmploiDuTemps::with('groupe')
+                ->orderByDesc('created_at')
+                ->get()
+                ->unique('groupe_id');
+
+            $result = [];
+            foreach ($jours as $jour) {
+                $rows = [];
+                for ($si = 0; $si < 4; $si++) {
+                    foreach ($emplois as $emploi) {
+                        $grille = $emploi->grille;
+                        if (!is_array($grille)) continue;
+                        $cell = $grille[$jour][$si] ?? null;
+                        if (!$cell || empty($cell['module'])) continue;
+                        $mod = $cell['module'];
+                        $rows[] = [
+                            'horaire'   => $horaires[$si],
+                            'formateur' => $cell['formateur'] ?? '—',
+                            'groupe'    => $emploi->groupe?->nom ?? '—',
+                            'salle'     => ($cell['mode'] ?? '') === 'DISTANCIEL' ? 'En ligne' : ($cell['salle'] ?? '—'),
+                            'module'    => is_array($mod) ? ($mod['intitule'] ?? $mod['code'] ?? '—') : (string)$mod,
+                            'mode'      => $cell['mode'] ?? 'PRESENTIEL',
+                        ];
+                    }
+                }
+                usort($rows, fn($a, $b) => $a['horaire'] !== $b['horaire']
+                    ? strcmp($a['horaire'], $b['horaire'])
+                    : strcmp($a['groupe'], $b['groupe']));
+                $result[$jour] = $rows;
+            }
+
+            return response()->json(['data' => $result]);
+        });
     });
 
     // ── SURVEILLANT ──
@@ -245,6 +283,81 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/plannings/{planning}', [PlanningController::class, 'update']);
     Route::get('/emploi-temps/view', fn() => response()->json(['page' => 'Voir EDT']));
 
+    // ── STAGIAIRE ──
+    Route::middleware('role:stagiaire')->prefix('stagiaire')->group(function () {
 
-    
+        // Liste des groupes (pour le sélecteur)
+        Route::get('/groupes', function () {
+            $groupes = DB::table('groupes')
+                ->select('groupes.id', 'groupes.nom',
+                    DB::raw("COALESCE(filieres.intitule, filieres.code, '') as filiere"),
+                    'groupes.filiere_id')
+                ->leftJoin('filieres', 'groupes.filiere_id', '=', 'filieres.id')
+                ->orderBy('groupes.nom')
+                ->get();
+            return response()->json(['data' => $groupes]);
+        });
+
+        // Emploi du temps du groupe sélectionné
+        Route::get('/emploi', function (\Illuminate\Http\Request $request) {
+            if (!$request->filled('groupe_id')) {
+                return response()->json(['data' => null]);
+            }
+            $emploi = \App\Models\EmploiDuTemps::with('groupe')
+                ->where('groupe_id', $request->groupe_id)
+                ->orderByDesc('created_at')
+                ->first();
+            if (!$emploi) {
+                return response()->json(['data' => null]);
+            }
+            return response()->json(['data' => [
+                'id'               => $emploi->id,
+                'groupe'           => $emploi->groupe?->nom ?? '—',
+                'semestre'         => $emploi->semestre,
+                'periodeDebut'     => $emploi->periode_debut?->format('d/m/Y'),
+                'formateur_parrain'=> $emploi->formateur_parrain,
+                'grille'           => $emploi->grille,
+            ]]);
+        });
+
+        // Modules du groupe sélectionné
+        Route::get('/modules', function (\Illuminate\Http\Request $request) {
+            if (!$request->filled('groupe_id')) {
+                return response()->json(['data' => []]);
+            }
+            $query = DB::table('modules')
+                ->select('modules.id', 'modules.intitule', 'modules.code',
+                    'modules.semestre', 'modules.mh_drif', 'modules.eg_et',
+                    DB::raw("COALESCE(formateurs.nom, '') as formateur"))
+                ->leftJoin('formateurs', 'modules.formateur_id', '=', 'formateurs.id')
+                ->where('modules.groupe_id', $request->groupe_id);
+            if ($request->filled('semestre')) {
+                $query->where('modules.semestre', $request->semestre);
+            }
+            return response()->json([
+                'data' => $query->orderBy('modules.semestre')->orderBy('modules.intitule')->get(),
+            ]);
+        });
+
+        // Planning de stage du groupe sélectionné
+        Route::get('/stages', function (\Illuminate\Http\Request $request) {
+            if (!$request->filled('groupe_id')) {
+                return response()->json(['data' => []]);
+            }
+            $stages = \App\Models\Stage::with(['groupe.filiere'])
+                ->where('groupe_id', $request->groupe_id)
+                ->orderBy('date_debut')
+                ->get()
+                ->map(fn($s) => [
+                    'id'         => $s->id,
+                    'date_debut' => $s->date_debut->format('d/m/Y'),
+                    'date_fin'   => $s->date_fin->format('d/m/Y'),
+                    'statut'     => $s->statut,
+                    'filiere'    => $s->groupe->filiere->intitule ?? '—',
+                    'duree_semaines' => (int) ceil($s->date_debut->diffInDays($s->date_fin) / 7),
+                ]);
+            return response()->json(['data' => $stages]);
+        });
+    });
+
 });

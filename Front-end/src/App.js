@@ -15,8 +15,9 @@ import DirecteurModules      from "./pages/directeur/Modules";
 import DirecteurImport       from "./pages/directeur/ImportExcel";
 import FormateurDashboard    from "./pages/formateur/Dashboard";
 import DirecteurPole         from "./pages/directeur/Pole";
-import DirecteurAlertes      from "./pages/directeur/Alertes";
-import DirecteurUtilisateurs from "./pages/directeur/Utilisateurs";
+import DirecteurAlertes         from "./pages/directeur/Alertes";
+import DirecteurUtilisateurs    from "./pages/directeur/Utilisateurs";
+import DirecteurSuiviJournalier from "./pages/directeur/SuiviJournalier";
 
 // Rôle Pôle
 import PoleLayout            from "./pages/pole/PoleLayout";
@@ -48,7 +49,11 @@ export default function App() {
           <Route path="/"      element={<HomeRedirect />} />
 
           {/* Espace Stagiaire */}
-          <Route path="/stagiaire/espace" element={<EspaceStagiaire />} />
+          <Route path="/stagiaire/espace" element={
+            <ProtectedRoute roles={["stagiaire"]}>
+              <EspaceStagiaire />
+            </ProtectedRoute>
+          } />
 
           {/* DIRECTEUR */}
           <Route path="/directeur" element={
@@ -65,7 +70,8 @@ export default function App() {
             <Route path="import"       element={<DirecteurImport />} />
             <Route path="alertes"      element={<DirecteurAlertes />} />
             <Route path="pole"         element={<DirecteurPole />} />
-            <Route path="utilisateurs" element={<DirecteurUtilisateurs />} />
+            <Route path="utilisateurs"    element={<DirecteurUtilisateurs />} />
+            <Route path="suivi-journalier" element={<DirecteurSuiviJournalier />} />
           </Route>
 
           {/* FORMATEUR */}

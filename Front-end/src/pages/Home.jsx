@@ -13,7 +13,7 @@ const SERVICES = [
     ),
     title: "Espace Stagiaire",
     desc: "Consultez vos cours, absences, notes et planning en temps réel.",
-    link: "/stagiaire/espace",
+    link: "/login",
     color: "teal",
   },
   {
@@ -77,7 +77,7 @@ export default function Home() {
             Organisez vos cours, vos stagiaires et vos ressources dans une seule plateforme unifiée, sécurisée et accessible partout.
           </p>
           <div className="hero-actions">
-            <Link to="/stagiaire/espace" className="btn">
+            <Link to="/login" className="btn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>

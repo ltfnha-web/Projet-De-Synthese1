@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
+import { DocumentFormateurOFPPT, openPrintWindow } from "../../components/PrintDocOFPPT";
 import "./FormateurDashboard.css";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
@@ -47,133 +48,6 @@ const Ico = {
   empty:    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>,
 };
 
-/* ─── print document (OFPPT format) ─────────────────────────────────── */
-function PrintDoc({ nom, semestre, periodeDebut, grille }) {
-  const TD  = { border: "1px solid #000", padding: "2px 5px", verticalAlign: "top", color: "#000", background: "#fff", fontSize: 9, fontFamily: "Arial, Helvetica, sans-serif" };
-  const TBL = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
-  return (
-    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: 9, color: "#000", background: "#fff", padding: "6px 8px", boxSizing: "border-box", width: "100%" }}>
-      {/* header */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "14%" }} /><col style={{ width: "56%" }} /><col style={{ width: "30%" }} /></colgroup>
-        <tbody><tr>
-          <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "4px 6px" }}>
-            <div style={{ fontWeight: 700, fontSize: 12 }}>OFPPT</div>
-            <div style={{ fontSize: 7.5, direction: "rtl", lineHeight: 1.5 }}>مكتب التكوين المهني وإنعاش الشغل</div>
-            <div style={{ fontSize: 7, color: "#555", direction: "rtl" }}>المملكة المغربية</div>
-            <div style={{ marginTop: 2, fontWeight: 700, fontSize: 9 }}>CF SALE I</div>
-          </td>
-          <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "5px 10px" }}>
-            <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2 }}>EMPLOI DU TEMPS</div>
-            <div style={{ fontSize: 9, direction: "rtl", fontFamily: "serif", color: "#333", margin: "2px 0" }}>جدول التوقيت الأسبوعي</div>
-            <div style={{ fontSize: 12, fontWeight: 700 }}>Année de Formation 2025-2026</div>
-          </td>
-          <td style={{ ...TD, textAlign: "right", verticalAlign: "middle", padding: "4px 8px" }}>
-            <div style={{ direction: "rtl", fontSize: 8.5, lineHeight: 1.7 }}>
-              <div style={{ fontWeight: 700 }}>مكتب التكوين المهني والتقني</div>
-              <div>Office de la Formation Professionnelle</div>
-              <div>et de la Promotion du Travail</div>
-            </div>
-          </td>
-        </tr></tbody>
-      </table>
-      {/* EFP */}
-      <table style={TBL}><tbody><tr>
-        <td style={{ ...TD, padding: "2px 6px" }}>
-          <span style={{ fontWeight: 700 }}>EFP : </span>ISTA HAY SALAM SALE
-          <span style={{ float: "right", fontWeight: 700, textDecoration: "underline" }}>Version 1</span>
-        </td>
-      </tr></tbody></table>
-      {/* cyan band */}
-      <table style={TBL}><tbody><tr>
-        <td style={{ border: "1px solid #000", padding: "3px 8px", background: "#00bcd4", textAlign: "center", fontWeight: 900, fontSize: 11 }}>
-          Période d'application : A partir du {periodeDebut ?? "—"}
-        </td>
-      </tr></tbody></table>
-      {/* formateur info */}
-      <table style={TBL}><tbody><tr>
-        <td style={{ ...TD, padding: "6px 10px" }}>
-          <table style={{ borderCollapse: "collapse", fontSize: 10 }}><tbody>
-            {[
-              ["Formateur :",          <strong key="f" style={{ fontSize: 11 }}>{nom}</strong>],
-              ["Année de Formation :", "2025-2026"],
-              ["Semestre :",           semestre],
-            ].map(([k, v], i) => (
-              <tr key={i}>
-                <td style={{ paddingRight: 10, fontWeight: 700, whiteSpace: "nowrap", lineHeight: 2, color: "#000" }}>{k}</td>
-                <td style={{ lineHeight: 2, color: "#000" }}>{v}</td>
-              </tr>
-            ))}
-          </tbody></table>
-        </td>
-      </tr></tbody></table>
-      {/* grid */}
-      <table style={TBL}>
-        <colgroup>
-          <col style={{ width: "7%" }} />
-          {[0,1,2,3].map(i => <col key={i} style={{ width: "23.25%" }} />)}
-        </colgroup>
-        <thead><tr>
-          <th style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, verticalAlign: "middle", padding: "2px 3px" }}>
-            <div style={{ fontSize: 8.5 }}>Séances</div><div style={{ fontSize: 8.5 }}>Jours</div>
-          </th>
-          {SEANCES.map((s, i) => (
-            <th key={i} style={{ ...TD, background: "#d0d8e8", textAlign: "center", fontWeight: 700, padding: "2px 4px" }}>
-              <div style={{ fontSize: 9 }}>{s.label}</div>
-              <div style={{ fontWeight: 400, fontSize: 8.5 }}>{s.horaire}</div>
-            </th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {JOURS.map(jour => {
-            const seances = Array.isArray(grille?.[jour]) ? grille[jour] : [null,null,null,null];
-            return (
-              <tr key={jour}>
-                <td style={{ ...TD, fontWeight: 700, fontSize: 9, textAlign: "center", verticalAlign: "middle", background: "#fafafa", padding: "2px 3px" }}>{jour}</td>
-                {seances.map((s, i) =>
-                  !s?.module
-                    ? <td key={i} style={{ ...TD, padding: "2px 4px" }}><div style={{ minHeight: 32 }} /></td>
-                    : <td key={i} style={{ ...TD, verticalAlign: "top", padding: "2px 4px" }}>
-                        <div style={{ fontSize: 8, color: "#444", marginBottom: 1 }}>{SEANCES[i].horaire}</div>
-                        <div style={{ fontWeight: 700, fontSize: 9, lineHeight: 1.25, marginBottom: 1 }}>{toStr(s.module)}</div>
-                        <div style={{ fontSize: 8.5, color: "#555", marginBottom: 1 }}>Grp. {toStr(s.groupe)}</div>
-                        <div style={{ fontSize: 8 }}>{s.mode === "DISTANCIEL" ? "Formation à distance" : `Présentiel${s.salle ? ` / ${s.salle}` : ""}`}</div>
-                      </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {/* footer */}
-      <table style={TBL}>
-        <colgroup><col style={{ width: "35%" }} /><col style={{ width: "35%" }} /><col style={{ width: "30%" }} /></colgroup>
-        <tbody><tr>
-          <td style={{ ...TD, verticalAlign: "top", padding: "3px 6px" }}>
-            <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 2, fontSize: 9, color: "#000" }}>Emargements :</div>
-            <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-              <div>Fait à Salé</div><div>Date : {periodeDebut ?? "—"}</div>
-            </div>
-            <div style={{ height: 22 }} />
-          </td>
-          <td style={{ ...TD, textAlign: "center", verticalAlign: "top", padding: "3px 6px" }}>
-            <div style={{ fontWeight: 700, textDecoration: "underline", marginBottom: 3, fontSize: 9, color: "#000" }}>Le Directeur</div>
-            <div style={{ height: 22 }} />
-            <div style={{ fontSize: 8.5, color: "#0055aa", fontWeight: 700, lineHeight: 1.7 }}>
-              <div>KADDOURI HICHAM</div><div>DIRECTEUR D'ETABLISSEMENT</div><div>ISTA HAY SALAM SALE</div>
-            </div>
-          </td>
-          <td style={{ ...TD, textAlign: "center", verticalAlign: "middle", padding: "3px 6px" }}>
-            <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 3, color: "#000" }}>DRRSK</div>
-            <div style={{ fontSize: 8.5, lineHeight: 1.7, color: "#000" }}>
-              <div>ISTA Hay Salam - CF SALE 1</div><div>Abd ABDELKRIM KHATABI</div><div>Hay Salam - Salé</div>
-            </div>
-          </td>
-        </tr></tbody>
-      </table>
-    </div>
-  );
-}
 
 /* ─── KPI card ───────────────────────────────────────────────────────── */
 function KpiCard({ icon, label, value, unit, color }) {
@@ -268,23 +142,7 @@ export default function FormateurDashboard() {
   const handleLogout = async () => { await logout(); navigate("/login"); };
 
   const handlePrint = () => {
-    const el = document.getElementById("fmt-print-doc");
-    if (!el) return;
-    const win = window.open("", "_blank", "width=1200,height=850");
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<title>Emploi du temps — ${user?.name ?? ""}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: #fff; font-family: Arial, Helvetica, sans-serif; }
-  @page { size: A4 landscape; margin: 5mm; }
-  @media print {
-    html { zoom: 0.82; }
-    @supports not (zoom: 1) { body { transform: scale(0.82); transform-origin: top left; width: 122%; } }
-  }
-</style></head><body>${el.innerHTML}</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 500);
+    openPrintWindow("fmt-print-doc", `Emploi du temps — ${user?.name ?? ""}`);
   };
 
   /* sort + filter */
@@ -512,11 +370,13 @@ export default function FormateurDashboard() {
 
             {/* hidden print div */}
             <div id="fmt-print-doc" style={{ display: "none" }}>
-              <PrintDoc
+              <DocumentFormateurOFPPT
                 nom={user?.name ?? "—"}
+                annee="2025-2026"
                 semestre={selected.semestre}
                 periodeDebut={selected.created_at}
                 grille={selected.grille}
+                signataire={selected.signataire_nom ?? ""}
               />
             </div>
           </div>

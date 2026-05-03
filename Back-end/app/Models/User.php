@@ -23,6 +23,7 @@ class User extends Authenticatable
         'statut',
         'formateur_id',   // lien vers formateurs.id (role formateur)
         'secteur_id',     // lien vers secteurs.id   (role pole)
+        'groupe_id',      // lien vers groupes.id    (role stagiaire)
     ];
 
     protected $hidden = [

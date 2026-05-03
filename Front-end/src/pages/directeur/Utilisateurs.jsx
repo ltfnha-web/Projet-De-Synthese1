@@ -46,6 +46,16 @@ function generateEmail(nom) {
     .join(".") + "@gmail.com";
 }
 
+function generatePoleMail(nom) {
+  if (!nom) return "";
+  return nom
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .split(/\s+/)
+    .join(".") + ".pole@gmail.com";
+}
+
 /* ════════════════════════════════════════
    COMPOSANT PRINCIPAL
 ════════════════════════════════════════ */
@@ -143,7 +153,20 @@ export default function Utilisateurs() {
   };
 
   const handleSecteurChange = (e) => {
-    setForm(p => ({ ...p, secteur_id: e.target.value }));
+    const sid = e.target.value;
+    const secteur = options.secteurs.find(s => String(s.id) === String(sid));
+    const resp = secteur?.responsable;
+    if (resp) {
+      setForm(p => ({
+        ...p,
+        secteur_id:   sid,
+        formateur_id: String(resp.id),
+        name:         resp.nom ?? "",
+        email:        generateEmail(resp.nom ?? ""),
+      }));
+    } else {
+      setForm(p => ({ ...p, secteur_id: sid, formateur_id: "", name: "", email: "" }));
+    }
   };
 
   /* ── Changement rôle : reset formateur/secteur, conserver name/email si même rôle ── */
@@ -586,27 +609,7 @@ export default function Utilisateurs() {
             {/* ════ RÔLE : PÔLE ════ */}
             {form.role === "pole" && (
               <>
-                <div className="form-group">
-                  <label className="form-label">Responsable (formateur) *</label>
-                  {options.formateurs_tous.length === 0 ? (
-                    <div style={{
-                      padding: "10px 14px", borderRadius: 8,
-                      background: "#fffbeb", border: "1px solid #fde68a",
-                      fontSize: 12, color: "#92400e",
-                    }}>
-                      Aucun formateur actif disponible.
-                    </div>
-                  ) : (
-                    <select className="form-select" value={form.formateur_id} onChange={handlePoleFormateurChange}>
-                      <option value="">— Sélectionner le responsable —</option>
-                      {options.formateurs_tous.map(f => (
-                        <option key={f.id} value={f.id}>{f.nom}</option>
-                      ))}
-                    </select>
-                  )}
-                  {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
-                </div>
-
+                {/* 1. Secteur first — auto-fills responsable */}
                 <div className="form-group">
                   <label className="form-label">Secteur / Pôle *</label>
                   {options.secteurs.length === 0 ? (
@@ -626,8 +629,74 @@ export default function Utilisateurs() {
                     </select>
                   )}
                   {errors.secteur_id && <div className="field-err">{errors.secteur_id[0]}</div>}
+                  {form.secteur_id && !options.secteurs.find(s => String(s.id) === String(form.secteur_id))?.responsable && (
+                    <div style={{ fontSize: 11, color: "var(--sl4)", marginTop: 4 }}>
+                      Aucun responsable assigné pour ce secteur.
+                    </div>
+                  )}
                 </div>
 
+                {/* 2. Responsable — auto-filled from secteur, manually overridable */}
+                <div className="form-group">
+                  <label className="form-label">
+                    Responsable (formateur) *
+                    {form.secteur_id && form.formateur_id && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: "var(--sl4)", fontWeight: 400, textTransform: "none" }}>
+                        (auto-rempli depuis l'assignation du pôle — modifiable)
+                      </span>
+                    )}
+                  </label>
+                  {options.formateurs_tous.length === 0 ? (
+                    <div style={{
+                      padding: "10px 14px", borderRadius: 8,
+                      background: "#fffbeb", border: "1px solid #fde68a",
+                      fontSize: 12, color: "#92400e",
+                    }}>
+                      Aucun formateur actif disponible.
+                    </div>
+                  ) : (
+                    <select className="form-select" value={form.formateur_id} onChange={handlePoleFormateurChange}>
+                      <option value="">— Sélectionner le responsable —</option>
+                      {options.formateurs_tous.map(f => (
+                        <option key={f.id} value={f.id}>{f.nom}</option>
+                      ))}
+                    </select>
+                  )}
+                  {errors.formateur_id && <div className="field-err">{errors.formateur_id[0]}</div>}
+                </div>
+
+                {/* 3. Email conflict warning */}
+                {form.formateur_id &&
+                  !options.formateurs_disponibles.find(f => String(f.id) === String(form.formateur_id)) && (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 8, marginBottom: 4,
+                    background: "#fffbeb", border: "1px solid #fde68a",
+                    fontSize: 12, color: "#92400e",
+                    display: "flex", flexDirection: "column", gap: 6,
+                  }}>
+                    <div style={{ fontWeight: 600 }}>
+                      Ce formateur possède déjà un compte formateur actif.
+                    </div>
+                    <div>
+                      Son email est peut-être déjà utilisé. Pour éviter un conflit, utilisez une adresse dédiée au rôle pôle.
+                    </div>
+                    {form.name && (
+                      <button
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, email: generatePoleMail(p.name) }))}
+                        style={{
+                          alignSelf: "flex-start", padding: "4px 10px", borderRadius: 6, cursor: "pointer",
+                          border: "1px solid #d97706", background: "#fef3c7", color: "#92400e",
+                          fontSize: 11, fontWeight: 600,
+                        }}
+                      >
+                        Utiliser : {generatePoleMail(form.name)}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Email */}
                 <div className="form-group">
                   <label className="form-label">
                     Email *
@@ -642,6 +711,7 @@ export default function Utilisateurs() {
                   {errors.email && <div className="field-err">{errors.email[0]}</div>}
                 </div>
 
+                {/* 5. Password */}
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">

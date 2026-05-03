@@ -196,8 +196,17 @@ class UserController extends Controller
 
         $secteurs = Secteur::whereNotIn('id', $secteursAvecPole)
             ->select('id', 'nom')
+            ->with(['poleSecteur' => fn($q) => $q->with(['formateur' => fn($fq) => $fq->select('id', 'nom')])])
             ->orderBy('nom')
-            ->get();
+            ->get()
+            ->map(fn($s) => [
+                'id'          => $s->id,
+                'nom'         => $s->nom,
+                'responsable' => $s->poleSecteur ? [
+                    'id'  => $s->poleSecteur->formateur_id,
+                    'nom' => $s->poleSecteur->formateur?->nom,
+                ] : null,
+            ]);
 
         return response()->json([
             'formateurs_disponibles' => $formateursDisponibles,

@@ -267,10 +267,10 @@ export default function DirecteurDashboard() {
     responsive: true, cutout: "65%",
     plugins: {
       legend: {
-        position: "right",
+        position: "bottom",
         labels: {
           font: { family: "'DM Sans', sans-serif", size: 11 },
-          padding: 12, usePointStyle: true, pointStyleWidth: 8, color: "#475569",
+          padding: 14, usePointStyle: true, pointStyleWidth: 8, color: "#475569",
           generateLabels: chart => chart.data.labels.map((label, i) => {
             const val = chart.data.datasets[0].data[i];
             const pct = ((val / totalGroupes) * 100).toFixed(0);
@@ -447,7 +447,7 @@ export default function DirecteurDashboard() {
       </Card>
 
       {/* ── KPI Cards ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
         {cards.map((c, i) => (
           <div key={i} style={{
             background: "white", borderRadius: 14, border: `1px solid ${C.border}`,
@@ -470,7 +470,7 @@ export default function DirecteurDashboard() {
       </div>
 
       {/* ── Charts Row 1 ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 16, marginBottom: 16 }}>
 
         <Card>
           <ChartHeader
@@ -511,7 +511,7 @@ export default function DirecteurDashboard() {
       </div>
 
       {/* ── Charts Row 2 ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 16 }}>
 
         <Card>
           <ChartHeader

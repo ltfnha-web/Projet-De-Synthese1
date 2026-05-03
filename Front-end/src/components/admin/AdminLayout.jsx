@@ -12,8 +12,9 @@ const NAV_MAIN = [
   { to: "/directeur/pole",         label: "Pôle",            icon: "target"    },
   { to: "/directeur/groupes",      label: "Groupes",         icon: "groups"    },
   { to: "/directeur/modules",      label: "Modules",         icon: "book"      },
-  { to: "/directeur/alertes",      label: "Alertes",         icon: "alert",    badge: true },
-  { to: "/directeur/import",       label: "Import",          icon: "upload"    },
+  { to: "/directeur/alertes",         label: "Alertes",          icon: "alert",   badge: true },
+  { to: "/directeur/suivi-journalier",label: "Suivi Journalier", icon: "clock"               },
+  { to: "/directeur/import",          label: "Import",           icon: "upload"              },
 ];
 
 // NOUVEAU : Espaces utilisateur

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
+import { openPrintWindow } from "../../components/PrintDocOFPPT";
 
 const TYPE_CONFIG = {
   critique: { label: "Critique",      color: "#9f1239", bg: "#fff1f2", border: "#fecdd3", icon: Icons.alert   },
@@ -96,19 +97,10 @@ export default function Alertes() {
     { label: "Total alertes",  count: data?.total    || 0, color: "var(--sl6)", bg: "var(--sl1)", icon: Icons.filter, key: "" },
   ];
 
-  // Impression : masquer les filtres et afficher seulement la liste
-  const handlePrint = () => window.print();
+  const handlePrint = () => openPrintWindow("alertes-print-doc", "Rapport des Alertes Pédagogiques");
 
   return (
     <div>
-      {/* Styles d'impression : masquer filtres, nav, header actions */}
-      <style>{`
-        @media print {
-          .pg-header .btn-secondary, .filter-panel, .pg-header-left .pg-subtitle { display: none !important; }
-          body { background: white !important; }
-        }
-      `}</style>
-
       {/* ── Header ── */}
       <div className="pg-header">
         <div className="pg-header-left">
@@ -380,6 +372,119 @@ export default function Alertes() {
           })}
         </div>
       )}
+
+      {/* ── Hidden print document ── */}
+      <div id="alertes-print-doc" style={{ display: "none" }}>
+        <AlertesPrintDoc
+          alertes={alertes}
+          summary={{ critique: data?.critique || 0, warning: data?.warning || 0, info: data?.info || 0, total: data?.total || 0 }}
+          date={new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+        />
+      </div>
+    </div>
+  );
+}
+
+const TYPE_PRINT_COLOR = { critique: "#9f1239", warning: "#92400e", info: "#1e40af" };
+
+function AlertesPrintDoc({ alertes, summary, date }) {
+  const NAVY = "#1a3a5c";
+  const thStyle = {
+    padding: "7px 10px", textAlign: "left",
+    background: NAVY, color: "white",
+    fontSize: 11, fontWeight: 700,
+    borderRight: "1px solid #2d5080",
+  };
+  const tdStyle = (bold = false) => ({
+    padding: "5px 9px", fontSize: 11,
+    verticalAlign: "top",
+    fontWeight: bold ? 700 : 400,
+    borderBottom: "1px solid #e2e8f0",
+  });
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", color: "#111", padding: "20px 24px" }}>
+
+      {/* ── Header OFPPT ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `3px solid ${NAVY}`, paddingBottom: 10, marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 10, color: "#555" }}>المملكة المغربية — وزارة التعليم المهني</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>OFPPT — ISTA Hay Salam</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, letterSpacing: "-.3px" }}>Rapport des Alertes Pédagogiques</div>
+          <div style={{ fontSize: 10, color: "#666", marginTop: 3 }}>Généré le {date}</div>
+        </div>
+        <div style={{ textAlign: "right", fontSize: 11 }}>
+          <div style={{ fontWeight: 700, color: NAVY }}>Année 2025–2026</div>
+          <div style={{ color: "#666", marginTop: 2 }}>{alertes.length} alerte(s) affichée(s)</div>
+        </div>
+      </div>
+
+      {/* ── Résumé ── */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 18 }}>
+        {[
+          { label: "Critiques",      count: summary.critique, color: "#9f1239", bg: "#fff1f2" },
+          { label: "Avertissements", count: summary.warning,  color: "#92400e", bg: "#fffbeb" },
+          { label: "À surveiller",   count: summary.info,     color: "#1e40af", bg: "#eff6ff" },
+          { label: "Total alertes",  count: summary.total,    color: NAVY,      bg: "#f1f5f9" },
+        ].map((s, i) => (
+          <div key={i} style={{
+            flex: 1, padding: "8px 12px", borderRadius: 6,
+            background: s.bg, border: `1px solid ${s.color}30`,
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.count}</div>
+            <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Table ── */}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Type</th>
+            <th style={thStyle}>Groupe</th>
+            <th style={thStyle}>Filière</th>
+            <th style={thStyle}>Secteur</th>
+            <th style={{ ...thStyle, textAlign: "center" }}>AVC</th>
+            <th style={thStyle}>Code alerte</th>
+            <th style={{ ...thStyle, minWidth: 180 }}>Message</th>
+            <th style={{ ...thStyle, borderRight: "none" }}>Modules concernés</th>
+          </tr>
+        </thead>
+        <tbody>
+          {alertes.map((a, i) => {
+            const typeColor = TYPE_PRINT_COLOR[a.type] || "#334155";
+            const rowBg = i % 2 === 0 ? "#fff" : "#f8fafc";
+            return (
+              <tr key={i} style={{ background: rowBg }}>
+                <td style={{ ...tdStyle(true), color: typeColor }}>
+                  {TYPE_CONFIG[a.type]?.label || a.type}
+                </td>
+                <td style={tdStyle(true)}>{a.groupe}</td>
+                <td style={tdStyle()}>{a.filiere}</td>
+                <td style={tdStyle()}>{a.secteur}</td>
+                <td style={{ ...tdStyle(true), textAlign: "center", color: typeColor }}>
+                  {a.avc > 0 ? `${a.avc}%` : "—"}
+                </td>
+                <td style={{ ...tdStyle(), fontSize: 10 }}>{CODE_LABELS[a.code] || a.code}</td>
+                <td style={{ ...tdStyle(), fontSize: 10, lineHeight: 1.4 }}>{a.message}</td>
+                <td style={{ ...tdStyle(), fontSize: 10 }}>
+                  {(a.modules || []).map(m => m.code).join(", ") || "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* ── Footer ── */}
+      <div style={{ marginTop: 20, paddingTop: 8, borderTop: `1px solid ${NAVY}`, display: "flex", justifyContent: "space-between", fontSize: 10, color: "#888" }}>
+        <span>ISTA Hay Salam — Système de Gestion Pédagogique</span>
+        <span>Document généré automatiquement</span>
+      </div>
     </div>
   );
 }
