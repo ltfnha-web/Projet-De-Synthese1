@@ -86,7 +86,7 @@ function calcChargeRecommandee(mhRestante, semestre) {
   return (mhRestante / semainesRestantes).toFixed(1);
 }
 
-function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cellSemestre, isStage }) {
+function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cellSemestre, isStage, isAbsent }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal]         = useState(value ?? "");
   const [saving, setSaving]   = useState(false);
@@ -130,6 +130,19 @@ function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cell
     />
   );
 
+  // Semaine bloquée par absence formateur → orange hachurée + non cliquable
+  if (isAbsent) return (
+    <td
+      title="Formateur absent — semaine bloquée"
+      style={{
+        width: 32, minWidth: 32, padding: 0,
+        borderRight: "1px solid var(--border)",
+        background: "repeating-linear-gradient(45deg,#fcd34d 0,#fcd34d 2px,#fffbeb 2px,#fffbeb 6px)",
+        cursor: "not-allowed",
+      }}
+    />
+  );
+
   const bg = saving ? "rgba(26,82,118,.12)" : value > 0 ? "rgba(16,185,129,.09)" : undefined;
 
   return (
@@ -156,18 +169,20 @@ function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, for
   const [saving, setSaving]     = useState(false);
   const rowBg = idx % 2 !== 0 ? "var(--sl0)" : "var(--surface)";
 
-  // Exclude stage weeks from all MH calculations
+  // Exclude stage and absent weeks from all MH calculations
   const stageWeeks         = (stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number);
+  const absentWeeks        = (p.semaines_absentes ?? []).map(Number);
+  const blockedWeeks       = [...new Set([...stageWeeks, ...absentWeeks])];
   const semestreNum        = p.semestre === "S2" ? 2 : 1;
   const semWeeks           = (semainesAnnee ?? []).filter(s => s.semestre === semestreNum);
   const totalPrevuSansStage = Object.entries(p.semaines ?? {})
-    .filter(([k]) => !stageWeeks.includes(Number(k)))
+    .filter(([k]) => !blockedWeeks.includes(Number(k)))
     .reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
   const mhRestanteReelle   = Math.max(0, (p.mh_drif ?? 0) - totalPrevuSansStage);
   const plannedWeeks       = Object.entries(p.semaines ?? {})
-    .filter(([k, v]) => parseFloat(v) > 0 && !stageWeeks.includes(Number(k)))
+    .filter(([k, v]) => parseFloat(v) > 0 && !blockedWeeks.includes(Number(k)))
     .map(([k]) => Number(k));
-  const freeWeeks          = semWeeks.filter(s => !plannedWeeks.includes(s.num) && !stageWeeks.includes(s.num));
+  const freeWeeks          = semWeeks.filter(s => !plannedWeeks.includes(s.num) && !blockedWeeks.includes(s.num));
   const recCharge          = freeWeeks.length > 0 && mhRestanteReelle > 0
     ? (mhRestanteReelle / freeWeeks.length).toFixed(1)
     : null;
@@ -319,7 +334,8 @@ function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, for
         <CellSemaine key={s.num} planningId={p.id} semaineNum={s.num}
           value={parseFloat(p.semaines?.[s.num]) || 0}
           planSemestre={p.semestre} cellSemestre={`S${s.semestre}`} onSave={onCellSave}
-          isStage={!!(stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number).includes(s.num)} />
+          isStage={stageWeeks.includes(s.num)}
+          isAbsent={!stageWeeks.includes(s.num) && absentWeeks.includes(s.num)} />
       ))}
       <td style={{ textAlign: "center", padding: "0 6px", whiteSpace: "nowrap" }}>
         {editing ? (
@@ -622,8 +638,9 @@ export default function Plannings() {
   const totalParSemaine = {};
   semainesAffichees.forEach(s => {
     totalParSemaine[s.num] = plannings.reduce((acc, p) => {
-      const isStage = (stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number).includes(s.num);
-      return isStage ? acc : acc + (parseFloat(p.semaines?.[s.num]) || 0);
+      const isStage  = (stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number).includes(s.num);
+      const isAbsent = (p.semaines_absentes ?? []).map(Number).includes(s.num);
+      return (isStage || isAbsent) ? acc : acc + (parseFloat(p.semaines?.[s.num]) || 0);
     }, 0);
   });
   const pendingGroupeIds = Object.keys(pendingModules);

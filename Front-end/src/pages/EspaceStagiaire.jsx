@@ -306,7 +306,7 @@ export default function EspaceStagiaire() {
           ) : (
             <div style={{ background: "rgba(255,255,255,.07)", borderRadius: 12, padding: "16px 24px", border: "1px solid rgba(255,255,255,.12)", textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "#94a3b8" }}>Sélectionnez votre groupe</div>
-              <div style={{ fontSize: 11, color: "#6366f1", marginTop: 4 }}>dans la barre ci-dessus</div>
+              <div style={{ fontSize: 11, color: "#22c55e", marginTop: 4 }}>dans la barre ci-dessus</div>
             </div>
           )}
         </div>
@@ -330,7 +330,7 @@ export default function EspaceStagiaire() {
         {activeTab === "overview" && (
           <div>
             <div style={{ display: "flex", gap: 14, marginBottom: 26, flexWrap: "wrap" }}>
-              <KpiCard icon={Ico.layers}    label="Séances / semaine" value={seancesCount}       unit="séances" color="#6366f1" />
+              <KpiCard icon={Ico.layers}    label="Séances / semaine" value={seancesCount}       unit="séances" color="#22c55e" />
               <KpiCard icon={Ico.clock}     label="Heures / semaine"  value={seancesCount * 2.5} unit="h"       color="#0891b2" />
               <KpiCard icon={Ico.book}      label="Modules"           value={modules.length}     unit="modules" color="#16a34a" />
               <KpiCard icon={Ico.briefcase} label="Stages planifiés"  value={stages.length}      unit="stages"  color="#d97706" />

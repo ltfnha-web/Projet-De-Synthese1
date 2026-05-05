@@ -14,6 +14,7 @@ use App\Http\Controllers\EmploiController;
 use App\Http\Controllers\FormateurEmploiController;
 use App\Http\Controllers\SalleController;
 use App\Http\Controllers\StageController;
+use App\Http\Controllers\FormateurAbsenceController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
@@ -152,6 +153,9 @@ Route::middleware('auth:sanctum')->group(function () {
          // Stages
           Route::get('/stages/semaines-bloquees', [StageController::class, 'semainesBloquees']);
           Route::apiResource('stages', StageController::class);
+
+        // Absences formateurs
+        Route::apiResource('absences', FormateurAbsenceController::class);
 
         Route::put('/plannings/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
         Route::post('/plannings/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);

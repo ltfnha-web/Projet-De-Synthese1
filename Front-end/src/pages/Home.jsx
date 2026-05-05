@@ -1,139 +1,156 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import "../styles/Home.css";
 
-const SERVICES = [
+const FEATURES = [
   {
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="8" y1="14" x2="16" y2="14"/>
+      </svg>
+    ),
+    title: "Planning de Formation",
+    desc: "Planifiez et distribuez les heures par module, suivez l'avancement en temps réel et visualisez les semaines encore disponibles.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+    ),
+    title: "Emplois du Temps",
+    desc: "Créez les emplois du temps des groupes et des formateurs. Consultez, imprimez et partagez en quelques clics.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    ),
+    title: "Alertes Pédagogiques",
+    desc: "Détectez automatiquement les modules en retard, les risques d'avancement insuffisant et les groupes à surveiller.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
     ),
-    title: "Espace Stagiaire",
-    desc: "Consultez vos cours, absences, notes et planning en temps réel.",
-    link: "/login",
-    color: "teal",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-      </svg>
-    ),
-    title: "Espace Formateur",
-    desc: "Gérez vos séances, ressources pédagogiques et évaluations.",
-    link: "/login",
-    color: "blue",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-      </svg>
-    ),
-    title: "Administration",
-    desc: "Superviser les établissements, directeurs et ressources humaines.",
-    link: "/login",
-    color: "amber",
+    title: "Gestion du Personnel",
+    desc: "Gérez formateurs, absences, filières, groupes et salles depuis un tableau de bord centralisé et sécurisé.",
   },
 ];
 
 export default function Home() {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    axios.get("/public-stats").then(r => setStats(r.data)).catch(() => {});
+  }, []);
+
   return (
     <div className="home-page">
+
       {/* ── Navbar ── */}
       <nav className="navbar">
         <div className="brand">
+          <div className="brand-dot" />
           <div className="brand-info">
-            <span className="brand-name">OFPPT</span>
-            <span className="brand-sub">Gestion Pédagogique</span>
+            <span className="brand-name">ISTA Hay Salam</span>
+            <span className="brand-sub">CF SALÉ I · OFPPT</span>
           </div>
         </div>
-        <div className="nav-links">
-          <a href="#services" className="nav-text-link">Services</a>
-          <Link to="/login" className="nav-cta-btn">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
-            </svg>
-            Se connecter
-          </Link>
-        </div>
+        <Link to="/login" className="nav-cta-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Se connecter
+        </Link>
       </nav>
 
-      {/* ── Hero Section ── */}
+      {/* ── Hero ── */}
       <section className="hero-section">
         <div className="hero-content">
+          <div className="hero-eyebrow">
+            <span className="eyebrow-dot" />
+            Plateforme numérique · Année 2025–2026
+          </div>
           <h1 className="hero-title">
-            Plateforme de<br />
-            <span>Gestion Pédagogique</span>
+            Gestion Pédagogique<br />
+            <span>Centralisée</span>
           </h1>
           <p className="hero-desc">
-            Organisez vos cours, vos stagiaires et vos ressources dans une seule plateforme unifiée, sécurisée et accessible partout.
+            Plannings, emplois du temps, alertes et suivi de formation — tout en un seul endroit pour l'ensemble du personnel de l'établissement.
           </p>
-          <div className="hero-actions">
-            <Link to="/login" className="btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-              </svg>
-              Espace Stagiaire
-            </Link>
-            <Link to="/login" className="btn-outline">
-              Accès Personnel
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
-            </Link>
-          </div>
+          <Link to="/login" className="btn-hero">
+            Accéder à la plateforme
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+              <polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </Link>
         </div>
 
-        {/* Formes décoratives */}
-        <div className="hero-decor decor-1"></div>
-        <div className="hero-decor decor-2"></div>
+        {/* Stats */}
+        {stats && (
+          <div className="hero-stats">
+            {[
+              { num: stats.total_formateurs, label: "Formateurs" },
+              { num: stats.total_groupes,    label: "Groupes"    },
+              { num: stats.total_filieres,   label: "Filières"   },
+              { num: stats.total_modules,    label: "Modules"    },
+            ].map((s, i) => (
+              <div className="stat-pill" key={i}>
+                <span className="stat-num">{s.num}</span>
+                <span className="stat-label">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="hero-decor decor-1" />
+        <div className="hero-decor decor-2" />
       </section>
 
-      {/* ── Services Section ── */}
-      <section className="services-section" id="services">
-        <div className="section-header">
-          <span className="section-tag">Nos espaces</span>
-          <h2 className="section-title">Choisissez votre espace</h2>
-          <p className="section-desc">Chaque profil dispose d'un accès personnalisé à la plateforme.</p>
+      {/* ── Features ── */}
+      <section className="features-section">
+        <div className="features-header">
+          <h2 className="features-title">Ce que la plateforme permet</h2>
+          <p className="features-sub">Des outils pensés pour la direction, les coordinateurs pôle et les formateurs.</p>
         </div>
-        <div className="services-grid">
-          {SERVICES.map((s, i) => (
-            <Link to={s.link} className={`service-card service-${s.color}`} key={i}>
-              <div className="service-icon">{s.icon}</div>
-              <h3 className="service-title">{s.title}</h3>
-              <p className="service-desc">{s.desc}</p>
-              <div className="service-arrow">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12 5 19 12 12 19"/>
-                </svg>
-              </div>
-            </Link>
+        <div className="features-grid">
+          {FEATURES.map((f, i) => (
+            <div className="feature-card" key={i}>
+              <div className="feature-icon-wrap">{f.icon}</div>
+              <h3 className="feature-title">{f.title}</h3>
+              <p className="feature-desc">{f.desc}</p>
+            </div>
           ))}
         </div>
       </section>
 
       {/* ── Footer ── */}
       <footer className="home-footer">
-        <div className="footer-brand">
-          <span>OFPPT © {new Date().getFullYear()} — Tous droits réservés</span>
-        </div>
-        <div className="footer-links">
-          <a href="#">Mentions légales</a>
-          <a href="#">Politique de confidentialité</a>
-          <a href="#">Contact</a>
-        </div>
+        <span>OFPPT — ISTA Hay Salam © {new Date().getFullYear()}</span>
+        <span style={{ color: "#d1d5db" }}>·</span>
+        <span>CF SALÉ I</span>
       </footer>
+
     </div>
   );
 }

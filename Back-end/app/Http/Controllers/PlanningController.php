@@ -82,9 +82,14 @@ class PlanningController extends Controller
         $plannings = $query->get()->map(function ($p) use ($semaines) {
             $mhBySemaine = $p->semaines->pluck('mh_prevue', 'semaine_num');
 
-            $totalPrevu   = $p->semaines->sum('mh_prevue');
             $mhDrif       = (float)($p->mh_drif ?? 0);
-            $mhRestante   = max(0, $mhDrif - $totalPrevu);
+
+            // Absent week nums — excluded from all calculations
+            $absentWeekNums = $p->semaines->where('statut', 'absent')->pluck('semaine_num')->toArray();
+
+            // totalPrevu excludes absent weeks
+            $totalPrevu = $p->semaines->filter(fn($s) => $s->statut !== 'absent')->sum('mh_prevue');
+            $mhRestante = max(0, $mhDrif - $totalPrevu);
 
             // MH réellement réalisée provenant du module (données réelles)
             $mhRealiseeModule = (float)($p->module?->mh_realisee_globale ?? 0);
@@ -95,12 +100,12 @@ class PlanningController extends Controller
             // Masse restante réelle = DRIF - réalisée module
             $mhRestanteReelle = max(0, $mhDrif - $mhRealiseeModule);
 
-            // Semaines restantes dans le semestre (non encore planifiées)
-            $semestreNum      = $p->semestre === 'S2' ? 2 : 1;
-            $semainesPlanif   = $p->semaines->pluck('semaine_num')->toArray();
-            $remainingWeeks   = collect($semaines)
+            // Semaines restantes : hors semaines déjà planifiées ET hors semaines d'absence
+            $semestreNum          = $p->semestre === 'S2' ? 2 : 1;
+            $semainesPlanifActifs = $p->semaines->filter(fn($s) => $s->statut !== 'absent')->pluck('semaine_num')->toArray();
+            $remainingWeeks       = collect($semaines)
                 ->where('semestre', $semestreNum)
-                ->filter(fn($s) => !in_array($s['num'], $semainesPlanif))
+                ->filter(fn($s) => !in_array($s['num'], $semainesPlanifActifs) && !in_array($s['num'], $absentWeekNums))
                 ->count();
 
             $massParSemaine = $remainingWeeks > 0 ? round($mhRestante / $remainingWeeks, 2) : 0;
@@ -128,6 +133,7 @@ class PlanningController extends Controller
                 'mode'                 => $p->mode ?? 'PRESENTIEL',
                 'charge_hebdo'         => $p->charge_hebdo ?? 0,
                 'semaines'             => $mhBySemaine,
+                'semaines_absentes'    => $p->semaines->where('statut', 'absent')->pluck('semaine_num')->values()->toArray(),
             ];
         });
 
@@ -199,21 +205,33 @@ class PlanningController extends Controller
             ]
         );
 
-        $totalPrevu  = PlanningSemaine::where('planning_id', $planning->id)->sum('mh_prevue');
-        $mhRestante  = max(0, $planning->mh_drif - $totalPrevu);
+        // Absent weeks for this planning — excluded from all calculations
+        $absentWeekNums      = PlanningSemaine::where('planning_id', $planning->id)
+            ->where('statut', 'absent')
+            ->pluck('semaine_num')
+            ->toArray();
+
+        // totalPrevu excludes absent weeks
+        $totalPrevu = PlanningSemaine::where('planning_id', $planning->id)
+            ->where(fn($q) => $q->where('statut', '!=', 'absent')->orWhereNull('statut'))
+            ->sum('mh_prevue');
+        $mhRestante = max(0, $planning->mh_drif - $totalPrevu);
 
         // Recalculate AVCE from module actual data
         $mhRealiseeModule = (float)($planning->module?->mh_realisee_globale ?? 0);
         $mhDrif           = (float)($planning->mh_drif ?? 0);
         $avce             = $mhDrif > 0 ? round(($mhRealiseeModule / $mhDrif) * 100, 1) : 0;
 
-        // Remaining weeks in semester
-        $allSemaines      = self::getSemainesAnnee();
-        $semestreNum      = $planning->semestre === 'S2' ? 2 : 1;
-        $semainesPlanif   = PlanningSemaine::where('planning_id', $planning->id)->pluck('semaine_num')->toArray();
-        $remainingWeeks   = collect($allSemaines)
+        // Remaining weeks: exclude already-planned weeks AND absent weeks
+        $allSemaines         = self::getSemainesAnnee();
+        $semestreNum         = $planning->semestre === 'S2' ? 2 : 1;
+        $semainesPlanifActifs = PlanningSemaine::where('planning_id', $planning->id)
+            ->where(fn($q) => $q->where('statut', '!=', 'absent')->orWhereNull('statut'))
+            ->pluck('semaine_num')
+            ->toArray();
+        $remainingWeeks = collect($allSemaines)
             ->where('semestre', $semestreNum)
-            ->filter(fn($s) => !in_array($s['num'], $semainesPlanif))
+            ->filter(fn($s) => !in_array($s['num'], $semainesPlanifActifs) && !in_array($s['num'], $absentWeekNums))
             ->count();
 
         $massParSemaine = $remainingWeeks > 0 ? round($mhRestante / $remainingWeeks, 2) : 0;

@@ -24,6 +24,7 @@ import PoleLayout            from "./pages/pole/PoleLayout";
 import Plannings             from "./pages/pole/Plannings";
 import Emplois               from "./pages/pole/Emplois";
 import PlanningStage         from "./pages/pole/PlanningStage";
+import PoleAbsences          from "./pages/pole/Absences";
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="plannings"      element={<Plannings />} />
             <Route path="emplois"        element={<Emplois />} />
             <Route path="planning-stage" element={<PlanningStage />} />
+            <Route path="absences"       element={<PoleAbsences />} />
           </Route>
 
           {/* Fallback */}

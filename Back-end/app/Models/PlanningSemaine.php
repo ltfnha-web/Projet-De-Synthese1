@@ -13,6 +13,7 @@ class PlanningSemaine extends Model
         'semaine_num',
         'semestre',
         'mh_prevue',
+        'statut',
     ];
 
     protected $casts = [
