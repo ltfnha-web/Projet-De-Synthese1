@@ -95,14 +95,95 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/pole/{secteur}',         [PoleController::class, 'remove']);
         Route::get('/alertes',                   [AlerteController::class, 'index']);
 
-        Route::get('/suivi-journalier', function () {
+        Route::get('/suivi-journalier', function (\Illuminate\Http\Request $request) {
             $jours    = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
             $horaires = ['08:30–11:00', '11:00–13:30', '13:30–16:00', '16:00–18:30'];
 
-            $emplois = \App\Models\EmploiDuTemps::with('groupe')
+            $today        = \Carbon\Carbon::today();
+            $debutSemaine = $today->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
+            $finSemaine   = $today->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
+
+            // ── Detect whether today falls inside an active school-year week ──
+            $semaines        = \App\Http\Controllers\PlanningController::getSemainesAnnee();
+            $semainesIndexed = collect($semaines)->keyBy('num');
+            $semaineCourante = collect($semaines)->first(function ($s) use ($today) {
+                $lundi  = \Carbon\Carbon::parse($s['date_lundi']);
+                $samedi = $lundi->copy()->addDays(6);
+                return $today->between($lundi, $samedi);
+            });
+
+            $annee         = $today->month >= 9 ? $today->year : $today->year - 1;
+            $anneeScolaire = $annee . '-' . ($annee + 1);
+
+            // ── All emplois ordered newest first ──
+            $allEmplois = \App\Models\EmploiDuTemps::with('groupe')
                 ->orderByDesc('created_at')
+                ->get();
+
+            // ── Build the list of available week snapshots for the filter ──
+            // Each entry = { num, date_lundi, label, emploi_count, created_at }
+            $semaines_disponibles = $allEmplois
+                ->whereNotNull('semaine_num')
+                ->groupBy('semaine_num')
+                ->map(function ($group, $num) use ($semainesIndexed) {
+                    $semInfo = $semainesIndexed->get($num);
+                    return [
+                        'num'          => (int) $num,
+                        'date_lundi'   => $semInfo['date_lundi'] ?? null,
+                        'semestre'     => $semInfo ? ($semInfo['semestre'] === 1 ? 'S1' : 'S2') : null,
+                        'emploi_count' => $group->count(),
+                        'created_at'   => $group->max('created_at'),
+                    ];
+                })
+                ->sortByDesc('num')
+                ->values();
+
+            // ── Optional week filter from query string ──
+            $filterSemaineNum  = $request->filled('semaine_num') ? (int) $request->input('semaine_num') : null;
+            $semaineCouranteNum = $semaineCourante ? $semaineCourante['num'] : null;
+
+            // ── Pick the best emploi per groupe ──
+            $emplois = $allEmplois
+                ->groupBy('groupe_id')
+                ->map(function ($group) use ($filterSemaineNum, $semaineCouranteNum) {
+                    if ($filterSemaineNum !== null) {
+                        // Specific week requested — use that week's emploi or nothing
+                        return $group->firstWhere('semaine_num', $filterSemaineNum);
+                    }
+                    // Default: prefer the current school-year week, else the most recent
+                    if ($semaineCouranteNum) {
+                        $match = $group->firstWhere('semaine_num', $semaineCouranteNum);
+                        if ($match) return $match;
+                    }
+                    return $group->first();
+                })
+                ->filter()
+                ->values();
+
+            // ── Determine which semaine is actually displayed ──
+            $displayedSemaineNum = $filterSemaineNum
+                ?? ($emplois->whereNotNull('semaine_num')->first()?->semaine_num);
+            $displayedSemaine = $displayedSemaineNum
+                ? $semainesIndexed->get($displayedSemaineNum)
+                : $semaineCourante;
+
+            // ── Index absences for the displayed week (not just today's week) ──
+            if ($displayedSemaine && isset($displayedSemaine['date_lundi'])) {
+                $semLundi = \Carbon\Carbon::parse($displayedSemaine['date_lundi']);
+                $semDimanche = $semLundi->copy()->addDays(6);
+            } else {
+                $semLundi    = $debutSemaine;
+                $semDimanche = $finSemaine;
+            }
+
+            $absences = \App\Models\FormateurAbsence::with('formateur')
+                ->where('date_debut', '<=', $semDimanche)
+                ->where('date_fin',   '>=', $semLundi)
                 ->get()
-                ->unique('groupe_id');
+                ->keyBy('formateur_id');
+
+            // ── Index all formateurs by normalised name for fast lookup ──
+            $formateurs = \App\Models\Formateur::all()->keyBy(fn($f) => mb_strtolower(trim($f->nom)));
 
             $result = [];
             foreach ($jours as $jour) {
@@ -113,14 +194,29 @@ Route::middleware('auth:sanctum')->group(function () {
                         if (!is_array($grille)) continue;
                         $cell = $grille[$jour][$si] ?? null;
                         if (!$cell || empty($cell['module'])) continue;
-                        $mod = $cell['module'];
+
+                        $mod          = $cell['module'];
+                        $formateurNom = $cell['formateur'] ?? '—';
+                        $formateurKey = mb_strtolower(trim($formateurNom));
+                        $formateur    = $formateurs[$formateurKey] ?? null;
+                        $formateurId  = $formateur?->id;
+                        $absence      = $formateurId ? ($absences[$formateurId] ?? null) : null;
+
                         $rows[] = [
-                            'horaire'   => $horaires[$si],
-                            'formateur' => $cell['formateur'] ?? '—',
-                            'groupe'    => $emploi->groupe?->nom ?? '—',
-                            'salle'     => ($cell['mode'] ?? '') === 'DISTANCIEL' ? 'En ligne' : ($cell['salle'] ?? '—'),
-                            'module'    => is_array($mod) ? ($mod['intitule'] ?? $mod['code'] ?? '—') : (string)$mod,
-                            'mode'      => $cell['mode'] ?? 'PRESENTIEL',
+                            'horaire'      => $horaires[$si],
+                            'formateur'    => $formateurNom,
+                            'formateur_id' => $formateurId,
+                            'groupe'       => $emploi->groupe?->nom ?? '—',
+                            'salle'        => ($cell['mode'] ?? '') === 'DISTANCIEL' ? 'En ligne' : ($cell['salle'] ?? '—'),
+                            'module'       => is_array($mod) ? ($mod['intitule'] ?? $mod['code'] ?? '—') : (string)$mod,
+                            'mode'         => $cell['mode'] ?? 'PRESENTIEL',
+                            'absent'       => $absence !== null,
+                            'absence'      => $absence ? [
+                                'id'         => $absence->id,
+                                'date_debut' => $absence->date_debut->format('Y-m-d'),
+                                'date_fin'   => $absence->date_fin->format('Y-m-d'),
+                                'cause'      => $absence->cause,
+                            ] : null,
                         ];
                     }
                 }
@@ -130,7 +226,16 @@ Route::middleware('auth:sanctum')->group(function () {
                 $result[$jour] = $rows;
             }
 
-            return response()->json(['data' => $result]);
+            return response()->json([
+                'data'                 => $result,
+                'is_active'            => $semaineCourante !== null,
+                'semaine'              => $displayedSemaine,
+                'semaine_courante'     => $semaineCourante,
+                'annee_scolaire'       => $anneeScolaire,
+                'has_emplois'          => $allEmplois->isNotEmpty(),
+                'semaines_disponibles' => $semaines_disponibles,
+                'filter_semaine_num'   => $filterSemaineNum,
+            ]);
         });
     });
 
@@ -232,6 +337,38 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json([
                 'data' => $query->orderBy('semestre')->orderBy('intitule')->get(),
             ]);
+        });
+
+        // Modules planifiés pour un groupe + numéro de semaine donnés
+        Route::get('/plannings-semaine', function (\Illuminate\Http\Request $request) {
+            $groupeId   = $request->input('groupe_id');
+            $semaineNum = (int) $request->input('semaine_num');
+
+            if (!$groupeId || !$semaineNum) {
+                return response()->json(['data' => []]);
+            }
+
+            $plannings = \App\Models\Planning::with(['module', 'formateur', 'semaines'])
+                ->where('groupe_id', $groupeId)
+                ->whereHas('semaines', fn($q) => $q->where('semaine_num', $semaineNum)->where('mh_prevue', '>', 0))
+                ->get();
+
+            $result = $plannings->map(function ($p) use ($semaineNum) {
+                $semaine = $p->semaines->firstWhere('semaine_num', $semaineNum);
+                $mhPrevue = (float)($semaine?->mh_prevue ?? 0);
+                return [
+                    'planning_id'   => $p->id,
+                    'module_id'     => $p->module_id,
+                    'module_nom'    => $p->module?->intitule ?? $p->module?->code ?? '—',
+                    'formateur_id'  => $p->formateur_id,
+                    'formateur_nom' => $p->formateur?->nom ?? '—',
+                    'semestre'      => $p->semestre,
+                    'mh_prevue'     => $mhPrevue,
+                    'nb_seances'    => max(1, (int) ceil($mhPrevue / 2.5)),
+                ];
+            });
+
+            return response()->json(['data' => $result]);
         });
 
         // Générer tous les emplois des formateurs depuis les emplois du temps existants

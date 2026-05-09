@@ -1,6 +1,7 @@
 // src/pages/pole/PlanningStage.jsx
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useConfirm } from "../../hooks/useConfirm";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toStr(v) {
@@ -238,6 +239,7 @@ export default function PlanningStage() {
   const [modal, setModal]              = useState(false);
   const [editTarget, setEditTarget]    = useState(null);
 
+  const [confirm, ConfirmDialog] = useConfirm();
   const flash = (msg, type = "ok") => {
     setAlert({ msg, type });
     setTimeout(() => setAlert(null), 4000);
@@ -269,9 +271,15 @@ export default function PlanningStage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Supprimer ce stage ? Les semaines seront de nouveau disponibles.")) return;
-    try { await axios.delete(`/stages/${id}`); flash("Stage supprimé."); fetchAll(); }
-    catch { flash("Erreur de suppression.", "err"); }
+    const ok = await confirm({
+      title: "Supprimer ce stage ?",
+      message: "Le stage sera supprimé et les semaines bloquées seront de nouveau disponibles pour planification.",
+      confirmLabel: "Supprimer le stage",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try { await axios.delete(`/stages/${id}`); flash("Stage supprimé avec succès."); fetchAll(); }
+    catch { flash("La suppression du stage a échoué. Veuillez réessayer.", "err"); }
   };
 
   const stagesFiltres = stages.filter(s => {
@@ -431,6 +439,7 @@ export default function PlanningStage() {
 
       {modal      && <StageModal groupes={groupes} onClose={() => setModal(false)}     onSave={handleSave} initial={null}       />}
       {editTarget && <StageModal groupes={groupes} onClose={() => setEditTarget(null)} onSave={handleSave} initial={editTarget} />}
+      {ConfirmDialog}
     </div>
   );
 }

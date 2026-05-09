@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
 import { downloadTablePdf } from "../../utils/UsePdf";
+import { useConfirm } from "../../hooks/useConfirm";
 
 export default function Formateurs() {
   const [data, setData]       = useState([]);
@@ -17,6 +18,7 @@ export default function Formateurs() {
   const [errors, setErrors]   = useState({});
   const [saving, setSaving]   = useState(false);
 
+  const [confirm, ConfirmDialog] = useConfirm();
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 3500); };
 
   const fetchData = useCallback(() => {
@@ -40,14 +42,20 @@ export default function Formateurs() {
       setModal(false); fetchData();
     } catch (e) {
       if (e.response?.status === 422) setErrors(e.response.data.errors || {});
-      else flash("Une erreur est survenue.", "err");
+      else flash("Impossible d'enregistrer le formateur. Vérifiez les informations saisies et réessayez.", "err");
     } finally { setSaving(false); }
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Supprimer ce formateur ?")) return;
-    try { await axios.delete(`/formateurs/${id}`); flash("Formateur supprimé."); fetchData(); }
-    catch { flash("Erreur lors de la suppression.", "err"); }
+    const ok = await confirm({
+      title: "Supprimer ce formateur ?",
+      message: "Le formateur sera définitivement supprimé. Cette action est irréversible.",
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try { await axios.delete(`/formateurs/${id}`); flash("Formateur supprimé avec succès."); fetchData(); }
+    catch { flash("La suppression a échoué. Le formateur est peut-être lié à des données existantes.", "err"); }
   };
 
   const F = (f) => ({ value: form[f], onChange: e => setForm(p => ({ ...p, [f]: e.target.value })), className: "form-input" });
@@ -192,6 +200,8 @@ export default function Formateurs() {
           </div>
         )}
       </div>
+
+      {ConfirmDialog}
 
       {/* ── Modal ── */}
       {modal && (

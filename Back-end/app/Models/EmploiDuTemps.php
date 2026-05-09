@@ -15,6 +15,7 @@ class EmploiDuTemps extends Model
         'created_by',
         'periode_debut',
         'semestre',
+        'semaine_num',
         'grille',
         'valide',
         'formateur_parrain',
@@ -24,6 +25,7 @@ class EmploiDuTemps extends Model
         'grille'        => 'array',
         'periode_debut' => 'date',
         'valide'        => 'boolean',
+        'semaine_num'   => 'integer',
     ];
 
     public function groupe()   { return $this->belongsTo(Groupe::class); }

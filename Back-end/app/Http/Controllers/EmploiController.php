@@ -33,6 +33,7 @@ class EmploiController extends Controller
                 'groupe_id'    => $e->groupe_id,
                 'periodeDebut' => $e->periode_debut?->format('d/m/Y'),
                 'semestre'     => $e->semestre,
+                'semaine_num'  => $e->semaine_num,
                 'valide'       => $e->valide,
             ]);
 
@@ -45,10 +46,11 @@ class EmploiController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'groupe_id'  => 'required|exists:groupes,id',
-            'date_debut' => 'required|date',
-            'semestre'   => 'required|in:S1,S2',
-            'grille'     => 'required|array',
+            'groupe_id'   => 'required|exists:groupes,id',
+            'date_debut'  => 'required|date',
+            'semestre'    => 'required|in:S1,S2',
+            'grille'      => 'required|array',
+            'semaine_num' => 'nullable|integer|min:1|max:50',
         ]);
 
         $seances = $this->parseGrille($request->grille, $request->semestre);
@@ -78,6 +80,7 @@ class EmploiController extends Controller
                     'created_by'       => $request->user()->id,
                     'periode_debut'    => $request->date_debut,
                     'semestre'         => $request->semestre,
+                    'semaine_num'      => $request->semaine_num ?? null,
                     'grille'           => $request->grille,
                     'valide'           => false,
                     'formateur_parrain'=> $request->formateur_parrain,

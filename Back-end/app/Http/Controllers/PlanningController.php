@@ -137,10 +137,19 @@ class PlanningController extends Controller
             ];
         });
 
+        $today           = Carbon::today();
+        $semaineCourante = collect($semaines)->first(function ($s) use ($today) {
+            $lundi  = Carbon::parse($s['date_lundi']);
+            $samedi = $lundi->copy()->addDays(6);
+            return $today->between($lundi, $samedi);
+        });
+
         return response()->json([
-            'plannings'      => $plannings,
-            'semaines_annee' => $semaines,
-            'annee_scolaire' => ($annee ?? $this->getAnneeCourante()) . '-' . (($annee ?? $this->getAnneeCourante()) + 1),
+            'plannings'        => $plannings,
+            'semaines_annee'   => $semaines,
+            'annee_scolaire'   => ($annee ?? $this->getAnneeCourante()) . '-' . (($annee ?? $this->getAnneeCourante()) + 1),
+            'is_active'        => $semaineCourante !== null,
+            'semaine_courante' => $semaineCourante,
         ]);
     }
 

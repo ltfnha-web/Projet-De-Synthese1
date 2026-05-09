@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
+import { useConfirm } from "../../hooks/useConfirm";
 
 const NB_SEM = 23;
 
@@ -417,10 +418,12 @@ function PendingRow({ pm, idx, formateurs, groupeId, onCreate }) {
 
 // ── COMPOSANT PRINCIPAL ───────────────────────────────────────────────────────
 export default function Plannings() {
-  const [plannings, setPlannings]         = useState([]);
-  const [semainesAnnee, setSemainesAnnee] = useState([]);
-  const [anneeScolaire, setAnneeScolaire] = useState("");
-  const [loading, setLoading]             = useState(true);
+  const [plannings, setPlannings]           = useState([]);
+  const [semainesAnnee, setSemainesAnnee]   = useState([]);
+  const [anneeScolaire, setAnneeScolaire]   = useState("");
+  const [isActive, setIsActive]             = useState(null);   // null = not yet loaded
+  const [semaineCourante, setSemaineCourante] = useState(null);
+  const [loading, setLoading]               = useState(true);
   const [alert, setAlert]                 = useState(null);
   const [filterGroupe, setFilterGroupe]   = useState("");
   const [filterSemestre, setFilterSemestre] = useState("");
@@ -434,6 +437,7 @@ export default function Plannings() {
   const [pendingModules, setPendingModules] = useState({});
   const [stagesBloquees, setStagesBloquees] = useState({});
 
+  const [confirm, ConfirmDialog] = useConfirm();
   const flash = (msg, type = "ok") => {
     setAlert({ msg, type });
     setTimeout(() => setAlert(null), 4000);
@@ -452,9 +456,11 @@ export default function Plannings() {
         setPlannings(planningsRes.data.plannings ?? []);
         setSemainesAnnee(planningsRes.data.semaines_annee ?? []);
         setAnneeScolaire(planningsRes.data.annee_scolaire ?? "");
+        setIsActive(planningsRes.data.is_active ?? null);
+        setSemaineCourante(planningsRes.data.semaine_courante ?? null);
         setStagesBloquees(stagesRes.data ?? {});
       })
-      .catch(() => flash("Erreur de chargement.", "err"))
+      .catch(() => flash("Impossible de charger les plannings. Vérifiez votre connexion et réessayez.", "err"))
       .finally(() => setLoading(false));
   }, [filterGroupe, filterSemestre]);
 
@@ -617,12 +623,18 @@ export default function Plannings() {
   };
 
   const deletePlanning = async (id) => {
-    if (!window.confirm("Supprimer ce planning ?")) return;
+    const ok = await confirm({
+      title: "Supprimer ce planning ?",
+      message: "Le planning et toutes les heures planifiées seront définitivement supprimés. Cette action est irréversible.",
+      confirmLabel: "Supprimer le planning",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await axios.delete(`/plannings/${id}`);
-      flash("Planning supprimé.");
+      flash("Planning supprimé avec succès.");
       fetchPlannings();
-    } catch { flash("Erreur de suppression.", "err"); }
+    } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
   };
 
   const handleDistributed = (planningId, data) => {
@@ -661,6 +673,44 @@ export default function Plannings() {
       {alert && (
         <div className={`al-alert al-alert-${alert.type}`}>
           {alert.type === "ok" ? Ico.check : Ico.alert} {alert.msg}
+        </div>
+      )}
+
+      {/* ── Period banner ── */}
+      {isActive === false && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "12px 18px", marginBottom: 16, borderRadius: "var(--r-lg)",
+          background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e",
+          fontSize: 13, fontWeight: 500,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>
+            Vous êtes actuellement <strong>hors de la période scolaire active</strong> ({anneeScolaire}).
+            Les plannings affichés correspondent à l'année écoulée. La nouvelle année scolaire débutera en septembre.
+          </span>
+        </div>
+      )}
+
+      {isActive === true && semaineCourante && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "10px 18px", marginBottom: 16, borderRadius: "var(--r-lg)",
+          background: "var(--g0)", border: "1px solid var(--g1)", color: "var(--g6)",
+          fontSize: 13, fontWeight: 500,
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span>
+            Semaine en cours&nbsp;: <strong>Semaine {semaineCourante.num}</strong>
+            {" · "}S{semaineCourante.semestre} · {anneeScolaire}
+            {" · "}À partir du <strong>{semaineCourante.date_lundi?.split("-").reverse().join("/")}</strong>
+          </span>
         </div>
       )}
 
@@ -750,17 +800,24 @@ export default function Plannings() {
                   }}>
                     Année scolaire {anneeScolaire}
                   </th>
-                  {semainesAffichees.map(s => (
-                    <th key={s.num} style={{
-                      width: 32, minWidth: 32, padding: "4px 0", textAlign: "center",
-                      fontSize: 9, fontWeight: 700,
-                      color: s.semestre === 1 ? "var(--p5)" : "#7c3aed",
-                      borderRight: s.num === premiereS2 - 1 ? "3px solid rgba(124,58,237,.25)" : "1px solid var(--border)",
-                      background: s.semestre === 1 ? "rgba(26,82,118,.05)" : "rgba(124,58,237,.05)",
-                    }}>
-                      S{s.num}
-                    </th>
-                  ))}
+                  {semainesAffichees.map(s => {
+                    const isCurrent = semaineCourante?.num === s.num;
+                    return (
+                      <th key={s.num} style={{
+                        width: 32, minWidth: 32, padding: "4px 0", textAlign: "center",
+                        fontSize: 9, fontWeight: isCurrent ? 900 : 700,
+                        color: isCurrent ? "#fff" : (s.semestre === 1 ? "var(--p5)" : "#7c3aed"),
+                        borderRight: s.num === premiereS2 - 1 ? "3px solid rgba(124,58,237,.25)" : "1px solid var(--border)",
+                        background: isCurrent
+                          ? (s.semestre === 1 ? "#1a527688" : "#7c3aed88")
+                          : (s.semestre === 1 ? "rgba(26,82,118,.05)" : "rgba(124,58,237,.05)"),
+                        outline: isCurrent ? "2px solid " + (s.semestre === 1 ? "#1a5276" : "#7c3aed") : "none",
+                        outlineOffset: -2,
+                      }}>
+                        S{s.num}
+                      </th>
+                    );
+                  })}
                   <th style={{ width: 88 }} />
                 </tr>
                 <tr style={{ background: "var(--sl0)", borderBottom: "2px solid var(--border)" }}>
@@ -771,15 +828,21 @@ export default function Plannings() {
                   <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 68 }}>Restante</th>
                   <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 96, borderRight: "2px solid var(--border)" }}>Avancement</th>
                   <th style={{ textAlign: "center", whiteSpace: "nowrap", minWidth: 44 }}>R/L</th>
-                  {semainesAffichees.map(s => (
-                    <th key={s.num} style={{
-                      textAlign: "center", fontSize: 9, padding: "5px 0", fontWeight: 500,
-                      color: "var(--sl4)", width: 32, minWidth: 32,
-                      borderRight: s.num === premiereS2 - 1 ? "3px solid rgba(124,58,237,.25)" : "1px solid var(--border)",
-                    }}>
-                      {s.date_lundi?.slice(5).replace("-", "/")}
-                    </th>
-                  ))}
+                  {semainesAffichees.map(s => {
+                    const isCurrent = semaineCourante?.num === s.num;
+                    return (
+                      <th key={s.num} style={{
+                        textAlign: "center", fontSize: 9, padding: "5px 0",
+                        fontWeight: isCurrent ? 800 : 500,
+                        color: isCurrent ? "var(--g6)" : "var(--sl4)",
+                        width: 32, minWidth: 32,
+                        borderRight: s.num === premiereS2 - 1 ? "3px solid rgba(124,58,237,.25)" : "1px solid var(--border)",
+                        background: isCurrent ? "var(--g0)" : undefined,
+                      }}>
+                        {s.date_lundi?.slice(5).replace("-", "/")}
+                      </th>
+                    );
+                  })}
                   <th style={{ width: 88 }} />
                 </tr>
               </thead>
@@ -940,6 +1003,7 @@ export default function Plannings() {
         </div>
       )}
 
+      {ConfirmDialog}
     </div>
   );
 }

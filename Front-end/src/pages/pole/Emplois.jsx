@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { DocumentOFPPT, DocumentFormateurOFPPT, openPrintWindow } from "../../components/PrintDocOFPPT";
+import { useConfirm } from "../../hooks/useConfirm";
 
 function toStr(value) {
   if (value == null) return "";
@@ -243,220 +244,339 @@ function ModalFormateurTimetable({ onClose, formateurs, onSaved }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MODAL CRÉER EMPLOI
+   MODAL CRÉER EMPLOI — flux en 2 étapes
+   Étape 1 : choisir groupe + semaine
+   Étape 2 : assigner les créneaux aux modules planifiés
 ═══════════════════════════════════════════════════════════════ */
-function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [] }) {
-  const [form, setForm] = useState({ groupe_id: "", date_debut: new Date().toISOString().split("T")[0], semestre: "S1", formateur_parrain: "", signataire_nom: "" });
-  const [grille, setGrille] = useState(() => { const g = {}; JOURS.forEach(j => { g[j] = [null,null,null,null]; }); return g; });
-  const [modules, setModules]       = useState([]);
-  const [formateurs, setFormateurs] = useState([]);
-  const [availableSalles, setAvail] = useState({});
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState(null);
+function ModalCreerEmploi({ onClose, onSaved, groupes, plannings = [], semainesAnnee = [] }) {
+  const [step, setStep]                     = useState(1);
+  const [groupeId, setGroupeId]             = useState("");
+  const [semaineNum, setSemaineNum]         = useState("");
+  const [planningModules, setPlanModules]   = useState([]);
+  const [slots, setSlots]                   = useState({});
+  const [availableSalles, setAvail]         = useState({});
+  const [formateurs, setFormateurs]         = useState([]);
+  const [form, setForm]                     = useState({ formateur_parrain: "", signataire_nom: "" });
+  const [loadingModules, setLoadingModules] = useState(false);
+  const [saving, setSaving]                 = useState(false);
+  const [error, setError]                   = useState(null);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const selectedGroupe  = groupes.find(g => String(g.id) === String(groupeId));
+  const selectedSemaine = semainesAnnee.find(s => s.num === Number(semaineNum));
+  const semestre        = selectedSemaine ? (selectedSemaine.semestre === 1 ? "S1" : "S2") : "S1";
+
+  useEffect(() => {
+    axios.get("/pole-formateurs").then(({ data }) => setFormateurs(data.data ?? data ?? [])).catch(() => {});
+  }, []);
+
+  const fetchPlanningModules = async () => {
+    if (!groupeId || !semaineNum) return;
+    setLoadingModules(true);
+    try {
+      const { data } = await axios.get(`/plannings-semaine?groupe_id=${groupeId}&semaine_num=${semaineNum}`);
+      const modules = data.data ?? [];
+      setPlanModules(modules);
+      const initial = {};
+      modules.forEach(p => {
+        initial[p.planning_id] = Array.from({ length: p.nb_seances }, () => ({
+          jour: "", seance: "", salle: "", salle_id: null, mode: "PRESENTIEL",
+        }));
+      });
+      setSlots(initial);
+    } catch { setPlanModules([]); }
+    finally { setLoadingModules(false); }
+  };
+
+  const handleContinue = async () => {
+    if (!groupeId)   { setError("Choisir un groupe."); return; }
+    if (!semaineNum) { setError("Choisir une semaine."); return; }
+    setError(null);
+    await fetchPlanningModules();
+    setStep(2);
+  };
 
   const fetchAvailableSalles = async (jour) => {
-    if (availableSalles[jour]) return;
-    try { const { data } = await axios.get(`/salles/disponibles?jour=${encodeURIComponent(jour)}&semestre=${form.semestre}`); setAvail(prev => ({ ...prev, [jour]: data.data ?? [] })); }
-    catch { setAvail(prev => ({ ...prev, [jour]: [] })); }
+    if (!jour || availableSalles[jour]) return;
+    try {
+      const { data } = await axios.get(`/salles/disponibles?jour=${encodeURIComponent(jour)}&semestre=${semestre}`);
+      setAvail(prev => ({ ...prev, [jour]: data.data ?? [] }));
+    } catch { setAvail(prev => ({ ...prev, [jour]: [] })); }
   };
 
-  const loadModules = async (gid, sem) => {
-    if (!gid) return;
-    try { const { data } = await axios.get(`/pole-modules?groupe_id=${gid}&semestre=${sem}`); setModules(data.data ?? data ?? []); } catch {}
-  };
-
-  const handleGroupeChange = v => { set("groupe_id", v); setModules([]); if (v) loadModules(v, form.semestre); };
-  const handleSemestreChange = v => { set("semestre", v); if (form.groupe_id) loadModules(form.groupe_id, v); };
-
-  useEffect(() => { axios.get("/pole-formateurs").then(({ data }) => setFormateurs(data.data ?? data ?? [])).catch(() => {}); }, []);
-
-  const setCell = (jour, si, field, value) => {
-    setGrille(prev => {
-      const next = { ...prev }; const row = [...(next[jour] || [null,null,null,null])];
-      if (!row[si]) row[si] = { module: "", formateur: "", salle: "", mode: "PRESENTIEL" };
-      else row[si] = { ...row[si] };
-      row[si][field] = value;
-      if (field === "module") {
-        if (value) {
-          const mod = modules.find(m => toStr(m.intitule ?? m.code) === value);
-          if (mod?.formateur_id) { const fmt = formateurs.find(f => String(f.id) === String(mod.formateur_id)); row[si].formateur = fmt ? toStr(fmt.nom) : ""; row[si].formateur_id = mod.formateur_id; }
-          else { row[si].formateur = ""; row[si].formateur_id = null; }
-          row[si].module_id = mod?.id ?? null;
-        } else { row[si] = null; }
+  const updateSlot = (planId, idx, field, value) => {
+    setSlots(prev => {
+      const arr = [...(prev[planId] ?? [])];
+      arr[idx] = { ...arr[idx], [field]: value };
+      if (field === "salle_id") {
+        const found = (availableSalles[arr[idx].jour] ?? []).find(s => String(s.id) === String(value));
+        arr[idx].salle = found ? found.nom : "";
       }
-      if (field === "salle_id") { const found = (availableSalles[jour] ?? []).find(s => String(s.id) === String(value)); row[si].salle = found ? found.nom : ""; row[si].salle_id = found ? found.id : null; }
-      next[jour] = row; return next;
+      if (field === "jour" && value) fetchAvailableSalles(value);
+      return { ...prev, [planId]: arr };
     });
   };
 
-  const clearCell = (jour, si) => setGrille(prev => { const next = { ...prev }; const row = [...(next[jour] || [])]; row[si] = null; next[jour] = row; return next; });
-  const addCell = (jour, si) => {
-    if (!form.groupe_id) { setError("Choisir un groupe d'abord."); return; }
-    fetchAvailableSalles(jour);
-    setGrille(prev => { const next = { ...prev }; const row = [...(next[jour] || [null,null,null,null])]; row[si] = { module: "", formateur: "", salle: "", salle_id: null, mode: "PRESENTIEL" }; next[jour] = row; return next; });
-  };
-
   const handleSubmit = async () => {
-    if (!form.groupe_id) { setError("Choisir un groupe."); return; }
+    if (!groupeId) { setError("Choisir un groupe."); return; }
     setSaving(true); setError(null);
+
+    const grille = {};
+    JOURS.forEach(j => { grille[j] = [null, null, null, null]; });
+
+    for (const [planId, planSlots] of Object.entries(slots)) {
+      const plan = planningModules.find(p => String(p.planning_id) === planId);
+      if (!plan) continue;
+      for (const slot of planSlots) {
+        if (!slot.jour || slot.seance === "" || slot.seance == null) continue;
+        const si = Number(slot.seance);
+        if (grille[slot.jour][si] !== null) continue;
+        grille[slot.jour][si] = {
+          module: plan.module_nom, module_id: plan.module_id,
+          formateur: plan.formateur_nom, formateur_id: plan.formateur_id,
+          salle: slot.salle, salle_id: slot.salle_id, mode: slot.mode,
+        };
+      }
+    }
+
     try {
-      const groupe = groupes.find(g => String(g.id) === String(form.groupe_id));
-      await axios.post("/emplois", { groupe: toStr(groupe?.nom ?? `Groupe ${form.groupe_id}`), groupe_id: Number(form.groupe_id), date_debut: form.date_debut, semestre: form.semestre, grille, formateur_parrain: form.formateur_parrain || null, signataire_nom: form.signataire_nom || null });
+      await axios.post("/emplois", {
+        groupe:             toStr(selectedGroupe?.nom ?? `Groupe ${groupeId}`),
+        groupe_id:          Number(groupeId),
+        date_debut:         selectedSemaine?.date_lundi ?? new Date().toISOString().split("T")[0],
+        semestre,
+        semaine_num:        Number(semaineNum),
+        grille,
+        formateur_parrain:  form.formateur_parrain || null,
+        signataire_nom:     form.signataire_nom    || null,
+      });
       onSaved();
     } catch (e) {
-      setError(e.response?.data?.message || (e.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(" | ") : null) || "Erreur inconnue");
+      setError(
+        e.response?.data?.message
+        || (e.response?.data?.conflicts ? e.response.data.conflicts.join(" | ") : null)
+        || (e.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(" | ") : null)
+        || "Erreur lors de l'enregistrement. Vérifiez les conflits de salles ou de formateurs."
+      );
     } finally { setSaving(false); }
   };
 
-  const inpSt = { width: "100%", padding: "5px 8px", border: "1px solid var(--sp-border)", borderRadius: 6, fontSize: 11, background: "var(--sp-gray-100)", color: "var(--sp-black)", outline: "none", boxSizing: "border-box" };
-  const groupeSelected = groupes.find(g => String(g.id) === String(form.groupe_id));
+  const selSt = { width: "100%", padding: "5px 8px", border: "1px solid var(--sp-border)", borderRadius: 5, fontSize: 11, background: "#fff", outline: "none", boxSizing: "border-box" };
 
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "flex-start", paddingTop: 24, paddingBottom: 24, overflowY: "auto" }}>
-      <div style={{ display: "flex", gap: 14, width: "100%", maxWidth: 1380, alignItems: "flex-start", margin: "0 auto", padding: "0 12px" }}>
-
-        <div style={{ flex: "1 1 860px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", overflow: "hidden", border: "1px solid var(--sp-border)" }}>
-          <div style={{ background: "var(--sp-black)", padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+  /* ── ÉTAPE 1 ─────────────────────────────────────────────── */
+  if (step === 1) {
+    return (
+      <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "center" }}>
+        <div style={{ width: "100%", maxWidth: 540, background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", overflow: "hidden", border: "1px solid var(--sp-border)" }}>
+          <div style={{ background: "var(--sp-black)", padding: "16px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>Créer un emploi du temps</div>
-              <div style={{ color: "rgba(255,255,255,.5)", fontSize: 11, marginTop: 2 }}>Remplir la grille horaire du groupe</div>
+              <div style={{ color: "rgba(255,255,255,.5)", fontSize: 11, marginTop: 2 }}>Étape 1 / 2 — Groupe et semaine</div>
             </div>
             <button className="sp-btn sp-btn--secondary" onClick={onClose} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>{Ico.close}</button>
           </div>
-          <div style={{ padding: "20px 22px" }}>
-            {error && <div style={{ padding: "10px 14px", background: "#fee2e2", color: "#dc2626", borderRadius: 6, marginBottom: 14, fontSize: 12 }}>{error}</div>}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 20 }}>
-              <div className="sp-form-group">
-                <label className="sp-form-label">Groupe *</label>
-                <select className="sp-form-control" value={form.groupe_id} onChange={e => handleGroupeChange(e.target.value)}>
-                  <option value="">Sélectionner un groupe</option>
-                  {groupes.map(g => <option key={g.id} value={g.id}>{toStr(g.nom ?? `Groupe ${g.id}`)}{g.filiere ? ` — ${toStr(g.filiere)}` : ""}</option>)}
-                </select>
-              </div>
-              <div className="sp-form-group">
-                <label className="sp-form-label">Semestre</label>
-                <select className="sp-form-control" value={form.semestre} onChange={e => handleSemestreChange(e.target.value)}>
-                  {["S1","S2"].map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="sp-form-group">
-                <label className="sp-form-label">Période début</label>
-                <input type="date" className="sp-form-control" value={form.date_debut} onChange={e => set("date_debut", e.target.value)} />
-              </div>
+
+          <div style={{ padding: "24px 24px" }}>
+            {error && <div style={{ padding: "10px 14px", background: "#fee2e2", color: "#dc2626", borderRadius: 6, marginBottom: 16, fontSize: 12 }}>{Ico.alert} {error}</div>}
+
+            <div className="sp-form-group" style={{ marginBottom: 18 }}>
+              <label className="sp-form-label">Groupe *</label>
+              <select className="sp-form-control" value={groupeId} onChange={e => { setGroupeId(e.target.value); setSemaineNum(""); }}>
+                <option value="">Sélectionner un groupe</option>
+                {groupes.map(g => <option key={g.id} value={g.id}>{toStr(g.nom ?? `Groupe ${g.id}`)}{g.filiere ? ` — ${g.filiere}` : ""}</option>)}
+              </select>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+            <div className="sp-form-group" style={{ marginBottom: 18 }}>
+              <label className="sp-form-label">Semaine *</label>
+              {semainesAnnee.length === 0 ? (
+                <div style={{ padding: "10px 14px", background: "#fef9c3", color: "#a16207", borderRadius: 6, fontSize: 12 }}>
+                  Aucune semaine disponible. Vérifiez que le planning est configuré.
+                </div>
+              ) : (
+                <select className="sp-form-control" value={semaineNum} onChange={e => setSemaineNum(e.target.value)}>
+                  <option value="">Sélectionner une semaine</option>
+                  {[1, 2].map(sem => {
+                    const semWeeks = semainesAnnee.filter(s => s.semestre === sem);
+                    if (semWeeks.length === 0) return null;
+                    return (
+                      <optgroup key={sem} label={sem === 1 ? "Semestre 1" : "Semestre 2"}>
+                        {semWeeks.map(s => {
+                          const d   = new Date(s.date_lundi);
+                          const fmt = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+                          return <option key={s.num} value={s.num}>Semaine {s.num} — {fmt}</option>;
+                        })}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+              )}
+            </div>
+
+            {selectedSemaine && (
+              <div style={{ padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 7, marginBottom: 18, fontSize: 12 }}>
+                <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 2 }}>Semaine {selectedSemaine.num} · {semestre}</div>
+                <div style={{ color: "#0284c7" }}>
+                  Du lundi {new Date(selectedSemaine.date_lundi).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--sp-border)" }}>
+              <button className="sp-btn sp-btn--secondary" type="button" onClick={onClose}>Annuler</button>
+              <button className="sp-btn sp-btn--primary" type="button" onClick={handleContinue} disabled={!groupeId || !semaineNum || loadingModules}>
+                {loadingModules ? "Chargement…" : "Continuer →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── ÉTAPE 2 ─────────────────────────────────────────────── */
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()} style={{ alignItems: "flex-start", paddingTop: 24, paddingBottom: 24, overflowY: "auto" }}>
+      <div style={{ display: "flex", gap: 14, width: "100%", maxWidth: 1200, alignItems: "flex-start", margin: "0 auto", padding: "0 12px" }}>
+
+        {/* Main panel */}
+        <div style={{ flex: "1 1 800px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", overflow: "hidden", border: "1px solid var(--sp-border)" }}>
+          <div style={{ background: "var(--sp-black)", padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>Créer un emploi du temps</div>
+              <div style={{ color: "rgba(255,255,255,.5)", fontSize: 11, marginTop: 2 }}>
+                {toStr(selectedGroupe?.nom)} · Semaine {semaineNum} · {semestre}
+              </div>
+            </div>
+            <button className="sp-btn sp-btn--secondary" onClick={onClose} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>{Ico.close}</button>
+          </div>
+
+          <div style={{ padding: "20px 22px" }}>
+            {error && <div style={{ padding: "10px 14px", background: "#fee2e2", color: "#dc2626", borderRadius: 6, marginBottom: 14, fontSize: 12 }}>{Ico.alert} {error}</div>}
+
+            <button type="button" onClick={() => { setStep(1); setError(null); }}
+              style={{ fontSize: 12, color: "#0369a1", background: "none", border: "none", cursor: "pointer", padding: "0 0 16px 0", display: "inline-flex", alignItems: "center", gap: 5 }}>
+              ← Étape précédente
+            </button>
+
+            {planningModules.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px 0", color: "var(--sp-gray-400)" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Aucun module planifié pour cette semaine</div>
+                <div style={{ fontSize: 12 }}>Vérifiez que des heures sont prévues (MH &gt; 0) pour la semaine {semaineNum} dans le planning de ce groupe.</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--sp-gray-600)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 14 }}>
+                  {planningModules.length} module{planningModules.length > 1 ? "s" : ""} planifié{planningModules.length > 1 ? "s" : ""} — assignez les créneaux
+                </div>
+
+                {planningModules.map(p => {
+                  const planSlots = slots[p.planning_id] ?? [];
+                  return (
+                    <div key={p.planning_id} style={{ border: "1px solid var(--sp-border)", borderRadius: 8, marginBottom: 14, overflow: "hidden" }}>
+                      <div style={{ background: "var(--sp-gray-100)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--sp-border)" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--sp-black)", marginBottom: 3 }}>{p.module_nom}</div>
+                          <div style={{ fontSize: 11, color: "var(--sp-gray-600)", display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontWeight: 600 }}>{p.formateur_nom}</span>
+                            <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "var(--sp-green-light)", color: "var(--sp-green)" }}>AUTO</span>
+                            {p.mh_prevue > 0 && (
+                              <span style={{ padding: "1px 7px", background: "#dcfce7", color: "#16a34a", borderRadius: 10, fontWeight: 700, fontSize: 10 }}>
+                                {p.mh_prevue}h prévues · {p.nb_seances} séance{p.nb_seances > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 12, background: p.semestre === "S1" ? "#eff6ff" : "#f5f3ff", color: p.semestre === "S1" ? "#1d4ed8" : "#7c3aed", border: `1px solid ${p.semestre === "S1" ? "#bfdbfe" : "#ddd6fe"}` }}>
+                          {p.semestre}
+                        </span>
+                      </div>
+
+                      <div style={{ padding: "12px 16px" }}>
+                        {planSlots.map((slot, idx) => {
+                          const sallesList = availableSalles[slot.jour];
+                          return (
+                            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: idx < planSlots.length - 1 ? 10 : 0, padding: "10px 12px", background: slot.jour && slot.seance !== "" ? "#f0f9ff" : "#f8fafc", borderRadius: 6, border: `1px solid ${slot.jour && slot.seance !== "" ? "#bae6fd" : "transparent"}` }}>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 600, color: "var(--sp-gray-600)", marginBottom: 4 }}>Jour *</div>
+                                <select style={selSt} value={slot.jour} onChange={e => updateSlot(p.planning_id, idx, "jour", e.target.value)}>
+                                  <option value="">Jour…</option>
+                                  {JOURS.map(j => <option key={j}>{j}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 600, color: "var(--sp-gray-600)", marginBottom: 4 }}>Séance *</div>
+                                <select style={selSt} value={slot.seance} onChange={e => updateSlot(p.planning_id, idx, "seance", e.target.value)}>
+                                  <option value="">Séance…</option>
+                                  {SEANCES.map((s, i) => <option key={i} value={i}>{s.label} · {s.horaire}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 600, color: "var(--sp-gray-600)", marginBottom: 4 }}>Mode</div>
+                                <select style={selSt} value={slot.mode} onChange={e => updateSlot(p.planning_id, idx, "mode", e.target.value)}>
+                                  <option value="PRESENTIEL">Présentiel</option>
+                                  <option value="DISTANCIEL">À distance</option>
+                                </select>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 600, color: "var(--sp-gray-600)", marginBottom: 4 }}>Salle</div>
+                                {slot.mode === "DISTANCIEL" ? (
+                                  <div style={{ padding: "5px 8px", fontSize: 10, color: "#0891b2", background: "#ecfeff", border: "1px solid #a5f3fc", borderRadius: 5 }}>En ligne</div>
+                                ) : sallesList === undefined ? (
+                                  <input type="text" style={selSt} placeholder="Cliquer pour charger…" value={slot.salle}
+                                    onClick={() => slot.jour && fetchAvailableSalles(slot.jour)}
+                                    onChange={e => updateSlot(p.planning_id, idx, "salle", e.target.value)} />
+                                ) : (
+                                  <select style={selSt} value={slot.salle_id ?? ""} onChange={e => updateSlot(p.planning_id, idx, "salle_id", e.target.value)}>
+                                    <option value="">Salle…</option>
+                                    {sallesList.length === 0 && <option disabled>Aucune salle disponible</option>}
+                                    {sallesList.map(s => <option key={s.id} value={s.id}>{s.nom}{s.capacite ? ` (${s.capacite})` : ""}</option>)}
+                                  </select>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 20 }}>
               <div className="sp-form-group">
-                <label className="sp-form-label">
-                  Formateur Parrain&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
-                </label>
-                <select className="sp-form-control" value={form.formateur_parrain} onChange={e => set("formateur_parrain", e.target.value)}>
+                <label className="sp-form-label">Formateur Parrain <span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span></label>
+                <select className="sp-form-control" value={form.formateur_parrain} onChange={e => setF("formateur_parrain", e.target.value)}>
                   <option value="">— Aucun —</option>
                   {formateurs.map(f => <option key={f.id} value={toStr(f.nom)}>{toStr(f.nom)}</option>)}
                 </select>
               </div>
               <div className="sp-form-group">
-                <label className="sp-form-label">
-                  Signataire (pied de page)&nbsp;<span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span>
-                </label>
-                <input type="text" className="sp-form-control" placeholder="Nom & Prénom du signataire…" value={form.signataire_nom} onChange={e => set("signataire_nom", e.target.value)} />
+                <label className="sp-form-label">Signataire <span style={{ fontWeight: 400, color: "var(--sp-gray-400)", fontSize: 10 }}>(optionnel)</span></label>
+                <input type="text" className="sp-form-control" placeholder="Nom & Prénom du signataire…" value={form.signataire_nom} onChange={e => setF("signataire_nom", e.target.value)} />
               </div>
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--sp-gray-600)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 12 }}>
-              Grille horaire — cliquer sur + pour ajouter une séance
-            </div>
-
-            <div style={{ overflowX: "auto", marginBottom: 18 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680, fontSize: 12 }}>
-                <thead>
-                  <tr>
-                    <th style={{ background: "var(--sp-black)", color: "#fff", padding: "10px 12px", textAlign: "left", width: 90, border: "1px solid #333", fontSize: 11, fontWeight: 700 }}>Jour</th>
-                    {SEANCES.map((s, i) => (
-                      <th key={i} style={{ background: "var(--sp-black)", color: "#fff", padding: "8px 12px", textAlign: "center", border: "1px solid #333" }}>
-                        <div style={{ fontWeight: 600, fontSize: 12 }}>{s.label}</div>
-                        <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.6 }}>{s.horaire}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {JOURS.map((jour, ji) => (
-                    <tr key={jour} style={{ background: ji % 2 === 0 ? "#fff" : "var(--sp-gray-100)" }}>
-                      <td style={{ padding: "10px 12px", fontWeight: 700, fontSize: 12, border: "1px solid var(--sp-border)" }}>{jour}</td>
-                      {[0,1,2,3].map(si => {
-                        const cell = grille[jour]?.[si];
-                        const list = availableSalles[jour];
-                        return (
-                          <td key={si} style={{ padding: 6, verticalAlign: "top", minWidth: 160, border: "1px solid var(--sp-border)" }}>
-                            {cell ? (
-                              <div style={{ borderRadius: 6, padding: "8px 10px", position: "relative", background: "var(--sp-green-light)", border: "1px solid var(--sp-green)" }}>
-                                <button type="button" onClick={() => clearCell(jour, si)} style={{ position: "absolute", top: 4, right: 4, background: "#fee2e2", border: "none", borderRadius: 4, color: "#dc2626", cursor: "pointer", width: 18, height: 18, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-                                <select style={{ ...inpSt, marginBottom: 5 }} value={cell.module} onChange={e => setCell(jour, si, "module", e.target.value)}>
-                                  <option value="">Module…</option>
-                                  {modules.map(m => <option key={m.id} value={toStr(m.intitule ?? m.code)}>{toStr(m.intitule ?? m.code)}</option>)}
-                                </select>
-                                {cell.formateur ? (
-                                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", marginBottom: 5, background: "#fff", border: "1px solid var(--sp-border)", borderRadius: 5, fontSize: 11, color: "var(--sp-black)", fontWeight: 600 }}>
-                                    <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "var(--sp-green-light)", color: "var(--sp-green)" }}>AUTO</span>
-                                    {cell.formateur}
-                                  </div>
-                                ) : (
-                                  <div style={{ padding: "4px 8px", marginBottom: 5, background: "#fff", border: "1px dashed var(--sp-border)", borderRadius: 5, fontSize: 11, color: "var(--sp-gray-400)", fontStyle: "italic" }}>Formateur (auto)</div>
-                                )}
-                                <select style={{ ...inpSt, fontSize: 10, marginBottom: 4 }} value={cell.mode} onChange={e => setCell(jour, si, "mode", e.target.value)}>
-                                  <option value="PRESENTIEL">Présentiel</option>
-                                  <option value="DISTANCIEL">Distanciel</option>
-                                </select>
-                                {cell.mode === "DISTANCIEL" ? (
-                                  <div style={{ padding: "4px 8px", fontSize: 10, color: "#0891b2", background: "#ecfeff", border: "1px solid #a5f3fc", borderRadius: 5 }}>Distance — sans salle</div>
-                                ) : list === undefined ? (
-                                  <input type="text" style={{ ...inpSt, fontSize: 10 }} placeholder="Salle…" value={cell.salle} onClick={() => fetchAvailableSalles(jour)} onChange={e => setCell(jour, si, "salle", e.target.value)} />
-                                ) : (
-                                  <select style={{ ...inpSt, fontSize: 10 }} value={cell.salle_id ?? ""} onChange={e => setCell(jour, si, "salle_id", e.target.value)}>
-                                    <option value="">Salle…</option>
-                                    {list.length === 0 && <option disabled>Aucune salle disponible</option>}
-                                    {list.map(s => <option key={s.id} value={s.id}>{s.nom}{s.capacite ? ` (${s.capacite})` : ""}</option>)}
-                                  </select>
-                                )}
-                              </div>
-                            ) : (
-                              <button type="button" onClick={() => addCell(jour, si)}
-                                style={{ width: "100%", padding: "18px 8px", background: "transparent", border: "2px dashed var(--sp-border)", borderRadius: 6, cursor: "pointer", color: "var(--sp-gray-400)", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
-                                onMouseOver={e => { e.currentTarget.style.borderColor = "var(--sp-green)"; e.currentTarget.style.color = "var(--sp-green)"; e.currentTarget.style.background = "var(--sp-green-light)"; }}
-                                onMouseOut={e => { e.currentTarget.style.borderColor = "var(--sp-border)"; e.currentTarget.style.color = "var(--sp-gray-400)"; e.currentTarget.style.background = "transparent"; }}
-                              >+</button>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 14, borderTop: "1px solid var(--sp-border)" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 14, borderTop: "1px solid var(--sp-border)", marginTop: 16 }}>
               <button className="sp-btn sp-btn--secondary" type="button" onClick={onClose}>Annuler</button>
-              <button className="sp-btn sp-btn--primary" type="button" onClick={handleSubmit} disabled={saving}>
+              <button className="sp-btn sp-btn--primary" type="button" onClick={handleSubmit} disabled={saving || planningModules.length === 0}>
                 {saving ? "Enregistrement…" : <>{Ico.check} Enregistrer</>}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Planning preview */}
-        <div style={{ flex: "0 0 330px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", border: "1px solid var(--sp-border)", overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }}>
+        {/* Planning preview sidebar */}
+        <div style={{ flex: "0 0 290px", background: "#fff", borderRadius: "var(--sp-radius)", boxShadow: "var(--sp-shadow-lg)", border: "1px solid var(--sp-border)", overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }}>
           <div style={{ background: "var(--sp-black)", padding: "12px 16px", flexShrink: 0 }}>
             <div style={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>Planning de référence</div>
             <div style={{ color: "rgba(255,255,255,.45)", fontSize: 11, marginTop: 2 }}>
-              {groupeSelected ? toStr(groupeSelected.nom) : "Aucun groupe"} · {form.semestre}
+              {selectedGroupe ? toStr(selectedGroupe.nom) : "Aucun groupe"} · {semestre}
             </div>
           </div>
           <div style={{ overflowY: "auto", flex: 1 }}>
-            <MiniPlanningPreview plannings={plannings} groupeId={form.groupe_id} semestre={form.semestre} />
+            <MiniPlanningPreview plannings={plannings} groupeId={groupeId} semestre={semestre} />
           </div>
         </div>
 
@@ -472,9 +592,20 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
   const grille = record.grille ?? null;
   const hasAny = grille && JOURS.some(j => (grille[j] ?? []).some(Boolean));
   const [signataire, setSignataire] = useState(record.signataire_nom ?? "");
+  const [confirm, ConfirmDialog] = useConfirm();
 
   const handlePrint = () => {
     openPrintWindow("saved-fmt-doc-content", `Emploi du temps — ${toStr(record.formateur)}`);
+  };
+
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: `Supprimer l'emploi de ${toStr(record.formateur)} ?`,
+      message: "L'emploi du temps enregistré sera définitivement supprimé. Cette action est irréversible.",
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    });
+    if (ok) onDelete(record.id);
   };
 
   return (
@@ -495,7 +626,7 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
             )}
             <button
               className="sp-btn sp-btn--secondary"
-              onClick={() => { if (window.confirm(`Supprimer l'emploi de ${toStr(record.formateur)} ?`)) onDelete(record.id); }}
+              onClick={handleDelete}
               style={{ height: 28, padding: "0 10px", fontSize: 12, color: "#dc2626", borderColor: "#dc2626" }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -504,6 +635,7 @@ function ModalViewFormateurEmploi({ record, onClose, onDelete }) {
             <button className="sp-btn sp-btn--secondary" onClick={onClose} style={{ height: 28, padding: "0 10px", fontSize: 12 }}>{Ico.close} Fermer</button>
           </div>
         </div>
+        {ConfirmDialog}
 
         {/* Body */}
         <div style={{ padding: "20px 22px" }}>
@@ -791,6 +923,7 @@ export default function Emplois() {
   const [groupes, setGroupes]               = useState([]);
   const [emplois, setEmplois]               = useState([]);
   const [plannings, setPlannings]           = useState([]);
+  const [semainesAnnee, setSemainesAnnee]   = useState([]);
   const [loading, setLoading]               = useState(true);
   const [showModal, setModal]               = useState(false);
   const [showFmtModal, setFmtModal]         = useState(false);
@@ -803,6 +936,7 @@ export default function Emplois() {
   const [emploiAModifier, setEmploiAModifier] = useState(null);
   const [generatingAll, setGeneratingAll]     = useState(false);
 
+  const [confirm, ConfirmDialog] = useConfirm();
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 4000); };
 
   const fetchAll = async () => {
@@ -814,7 +948,11 @@ export default function Emplois() {
       ]);
       if (gRes.status  === "fulfilled") { const d = gRes.value.data;  setGroupes(Array.isArray(d) ? d : (d.data ?? [])); }
       if (eRes.status  === "fulfilled") { const d = eRes.value.data;  setEmplois(Array.isArray(d) ? d : (d.data ?? [])); }
-      if (pRes.status  === "fulfilled") { const d = pRes.value.data;  setPlannings(d.plannings ?? (Array.isArray(d) ? d : (d.data ?? []))); }
+      if (pRes.status  === "fulfilled") {
+        const d = pRes.value.data;
+        setPlannings(d.plannings ?? (Array.isArray(d) ? d : (d.data ?? [])));
+        if (d.semaines_annee) setSemainesAnnee(d.semaines_annee);
+      }
       if (fRes.status  === "fulfilled") { const d = fRes.value.data;  setFormateurs(Array.isArray(d) ? d : (d.data ?? [])); }
       if (feRes.status === "fulfilled") { const d = feRes.value.data; setFmtEmplois(Array.isArray(d) ? d : (d.data ?? [])); }
     } finally { setLoading(false); }
@@ -827,7 +965,7 @@ export default function Emplois() {
       const { data } = await axios.get(`/emplois/${id}`);
       setEmploiActif(data.data ?? data);
       setTimeout(() => document.getElementById("emploi-doc")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch { flash("Erreur de chargement.", "err"); }
+    } catch { flash("Impossible d'afficher l'emploi du temps. Vérifiez votre connexion.", "err"); }
   };
 
   // Charger un emploi pour le modifier
@@ -835,46 +973,58 @@ export default function Emplois() {
     try {
       const { data } = await axios.get(`/emplois/${id}`);
       setEmploiAModifier(data.data ?? data);
-    } catch { flash("Erreur de chargement de l'emploi.", "err"); }
+    } catch { flash("Impossible de charger l'emploi à modifier. Veuillez réessayer.", "err"); }
   };
 
   // Générer tous les emplois de formateurs depuis les emplois du temps existants
   const genererTousEmploisFormateurs = async () => {
-    if (!window.confirm("Générer les emplois de tous les formateurs depuis les emplois du temps existants ?")) return;
+    const ok = await confirm({
+      title: "Générer les emplois de tous les formateurs ?",
+      message: "Cette action va créer les emplois du temps individuels de chaque formateur à partir des emplois du temps existants. Les emplois déjà générés ne seront pas modifiés.",
+      confirmLabel: "Générer les emplois",
+      variant: "warning",
+    });
+    if (!ok) return;
     setGeneratingAll(true);
     try {
       const { data } = await axios.post("/generer-emplois-formateurs", { semestre: "S1" });
-      flash(data.message ?? "Emplois générés.");
+      flash(data.message ?? "Emplois générés avec succès.");
       fetchAll();
     } catch (e) {
-      flash(e.response?.data?.message ?? "Erreur lors de la génération.", "err");
+      flash(e.response?.data?.message ?? "La génération a échoué. Veuillez réessayer.", "err");
     } finally { setGeneratingAll(false); }
   };
 
   const supprimerEmploi = async (id) => {
-    if (!window.confirm("Supprimer cet emploi du temps ?")) return;
+    const ok = await confirm({
+      title: "Supprimer cet emploi du temps ?",
+      message: "L'emploi du temps et toutes ses séances seront définitivement supprimés. Cette action est irréversible.",
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await axios.delete(`/emplois/${id}`);
-      flash("Emploi supprimé.");
+      flash("Emploi du temps supprimé.");
       if (emploiActif?.id === id) setEmploiActif(null);
       fetchAll();
-    } catch { flash("Erreur de suppression.", "err"); }
+    } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
   };
 
   const afficherFormateurEmploi = async (id) => {
     try {
       const { data } = await axios.get(`/formateur-emplois/${id}`);
       setViewingFmt(data.data ?? data);
-    } catch { flash("Erreur de chargement.", "err"); }
+    } catch { flash("Impossible de charger l'emploi du formateur. Veuillez réessayer.", "err"); }
   };
 
   const supprimerFormateurEmploi = async (id) => {
     try {
       await axios.delete(`/formateur-emplois/${id}`);
-      flash("Emploi du formateur supprimé.");
+      flash("Emploi du formateur supprimé avec succès.");
       setViewingFmt(null);
       fetchAll();
-    } catch { flash("Erreur de suppression.", "err"); }
+    } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
   };
 
   const handlePrint = () => {
@@ -910,7 +1060,7 @@ export default function Emplois() {
         </div>
       )}
 
-      {showModal && <ModalCreerEmploi onClose={() => setModal(false)} onSaved={() => { setModal(false); fetchAll(); flash("Emploi du temps créé."); }} groupes={groupes} plannings={plannings} />}
+      {showModal && <ModalCreerEmploi onClose={() => setModal(false)} onSaved={() => { setModal(false); fetchAll(); flash("Emploi du temps créé."); }} groupes={groupes} plannings={plannings} semainesAnnee={semainesAnnee} />}
       {showFmtModal && <ModalFormateurTimetable onClose={() => setFmtModal(false)} formateurs={formateurs} onSaved={() => { fetchAll(); flash("Emploi du formateur sauvegardé."); }} />}
       {viewingFmtEmploi && <ModalViewFormateurEmploi record={viewingFmtEmploi} onClose={() => setViewingFmt(null)} onDelete={supprimerFormateurEmploi} />}
       {/* Modal modification d'emploi */}
@@ -954,6 +1104,7 @@ export default function Emplois() {
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <span className={`sp-status ${e.valide ? "sp-status--active" : "sp-status--pending"}`}>{e.valide ? "Validé" : "En attente"}</span>
                 {e.semestre && <span className="sp-status sp-status--closed">{e.semestre}</span>}
+                {e.semaine_num && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: "#f0f9ff", color: "#0369a1", border: "1px solid #bae6fd" }}>S{e.semaine_num}</span>}
               </div>
             </div>
           ))}
@@ -1038,6 +1189,7 @@ export default function Emplois() {
           </div>
         </div>
       )}
+      {ConfirmDialog}
     </div>
   );
 }

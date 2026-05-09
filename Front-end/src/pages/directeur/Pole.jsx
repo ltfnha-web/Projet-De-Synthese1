@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
 import { downloadTablePdf } from "../../utils/UsePdf";
+import { useConfirm } from "../../hooks/useConfirm";
 
 function AvcBar({ value }) {
   if (value == null) return <span style={{ color: "var(--sl4)", fontSize: 12 }}>—</span>;
@@ -44,6 +45,7 @@ export default function Pole() {
   const [assignForm, setAssignForm]   = useState({ formateur_id: "", notes: "" });
   const [saving, setSaving]           = useState(false);
 
+  const [confirm, ConfirmDialog] = useConfirm();
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 4000); };
 
   const fetchSecteurs = useCallback(() => {
@@ -93,17 +95,23 @@ export default function Pole() {
       setModal(false);
       fetchSecteurs();
       if (selectedSecteur?.id === modalSecteur.id) fetchGroupes(modalSecteur.id);
-    } catch { flash("Erreur lors de l'enregistrement.", "err"); }
+    } catch { flash("Impossible d'enregistrer. Vérifiez votre connexion et réessayez.", "err"); }
     finally { setSaving(false); }
   };
 
   const removeResponsable = async (secteurId) => {
-    if (!window.confirm("Retirer le responsable de ce secteur ?")) return;
+    const ok = await confirm({
+      title: "Retirer le responsable de ce secteur ?",
+      message: "Ce secteur n'aura plus de responsable assigné. Vous pourrez en assigner un nouveau à tout moment.",
+      confirmLabel: "Retirer le responsable",
+      variant: "warning",
+    });
+    if (!ok) return;
     try {
       await axios.delete(`/pole/${secteurId}`);
-      flash("Responsable retiré.");
+      flash("Responsable retiré avec succès.");
       fetchSecteurs();
-    } catch { flash("Erreur.", "err"); }
+    } catch { flash("Impossible de retirer le responsable. Veuillez réessayer.", "err"); }
   };
 
   const avcColor = (avc) => {
@@ -372,6 +380,8 @@ export default function Pole() {
       )}
 
       {/* ── Modal assign ── */}
+      {ConfirmDialog}
+
       {modal && modalSecteur && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal" style={{ width: 480 }}>

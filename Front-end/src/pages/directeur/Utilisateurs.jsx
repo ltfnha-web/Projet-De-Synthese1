@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Icons } from "../../components/admin/Icons";
+import { useConfirm } from "../../hooks/useConfirm";
 
 /* ════════════════════════════════════════
    CONFIG RÔLES
@@ -88,6 +89,8 @@ export default function Utilisateurs() {
     formateurs_tous:        [],
     secteurs:               [],
   });
+
+  const [confirm, ConfirmDialog] = useConfirm();
 
   /* ── Flash ── */
   const flash = (msg, type = "ok") => {
@@ -218,7 +221,7 @@ export default function Utilisateurs() {
     try {
       if (editing) {
         await axios.put(`/users/${editing.id}`, form);
-        flash("Utilisateur mis à jour.");
+        flash("Utilisateur mis à jour avec succès.");
       } else {
         await axios.post("/users", form);
         flash("Utilisateur créé avec succès.");
@@ -231,7 +234,7 @@ export default function Utilisateurs() {
         .catch(() => {});
     } catch (e) {
       if (e.response?.status === 422) setErrors(e.response.data.errors || {});
-      else flash(e.response?.data?.message || "Erreur.", "err");
+      else flash(e.response?.data?.message || "Impossible d'enregistrer l'utilisateur. Vérifiez les informations saisies.", "err");
     } finally {
       setSaving(false);
     }
@@ -239,13 +242,19 @@ export default function Utilisateurs() {
 
   /* ── Delete ── */
   const remove = async (u) => {
-    if (!window.confirm(`Supprimer le compte de ${u.name} ?`)) return;
+    const ok = await confirm({
+      title: `Supprimer le compte de ${u.name} ?`,
+      message: "Ce compte sera définitivement supprimé. L'utilisateur ne pourra plus se connecter.",
+      confirmLabel: "Supprimer le compte",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await axios.delete(`/users/${u.id}`);
-      flash("Utilisateur supprimé.");
+      flash("Compte supprimé avec succès.");
       fetchData();
     } catch (e) {
-      flash(e.response?.data?.message || "Erreur.", "err");
+      flash(e.response?.data?.message || "La suppression a échoué. Veuillez réessayer.", "err");
     }
   };
 
@@ -508,6 +517,8 @@ export default function Utilisateurs() {
           </div>
         )}
       </div>
+
+      {ConfirmDialog}
 
       {/* ════════════════════════════════════════
           MODAL
