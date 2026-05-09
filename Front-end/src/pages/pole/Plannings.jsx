@@ -362,7 +362,7 @@ function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, for
 function PendingRow({ pm, idx, formateurs, groupeId, onCreate }) {
   const [fid, setFid]           = useState(pm.formateur_id ?? "");
   const [charge, setCharge]     = useState(pm.charge_hebdo ?? "");
-  const [semestre, setSemestre] = useState(pm.semestre ?? "S1");
+  const [semestre, setSemestre] = useState(pm.semestre === "S1" || pm.semestre === "S2" ? pm.semestre : "S1");
   const [creating, setCreating] = useState(false);
   const rowBg = idx % 2 !== 0 ? "var(--sl0)" : "var(--surface)";
 
@@ -482,7 +482,7 @@ export default function Plannings() {
     if (!modal) setModules([]);
   }, [modal]);
 
-  const normSem = (s) => s === 1 || s === "1" ? "S1" : s === 2 || s === "2" ? "S2" : (s ?? "S1");
+  const normSem = (s) => s === 1 || s === "1" ? "S1" : s === 2 || s === "2" ? "S2" : (s || "S1");
 
   const computePendingModules = (groupeId, allModules, existingPlannings, formateursMap) => {
     const usedModuleIds = new Set(
@@ -588,7 +588,7 @@ export default function Plannings() {
         groupe_id:    parseInt(groupeId),
         module_id:    pm.module_id,
         formateur_id: parseInt(fid),
-        semestre:     pm.semestre,
+        semestre:     pm.semestre === "S1" || pm.semestre === "S2" ? pm.semestre : "S1",
         mh_drif:      parseInt(pm.mh_drif),
         charge_hebdo: pm.charge_hebdo ? parseFloat(pm.charge_hebdo) : undefined,
         type:         "Régionale",

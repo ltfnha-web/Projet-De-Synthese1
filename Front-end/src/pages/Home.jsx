@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
 import "../styles/Home.css";
 
 const FEATURES = [
@@ -55,12 +53,6 @@ const FEATURES = [
 ];
 
 export default function Home() {
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    axios.get("/public-stats").then(r => setStats(r.data)).catch(() => {});
-  }, []);
-
   return (
     <div className="home-page">
 
@@ -105,23 +97,6 @@ export default function Home() {
             </svg>
           </Link>
         </div>
-
-        {/* Stats */}
-        {stats && (
-          <div className="hero-stats">
-            {[
-              { num: stats.total_formateurs, label: "Formateurs" },
-              { num: stats.total_groupes,    label: "Groupes"    },
-              { num: stats.total_filieres,   label: "Filières"   },
-              { num: stats.total_modules,    label: "Modules"    },
-            ].map((s, i) => (
-              <div className="stat-pill" key={i}>
-                <span className="stat-num">{s.num}</span>
-                <span className="stat-label">{s.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
 
         <div className="hero-decor decor-1" />
         <div className="hero-decor decor-2" />
