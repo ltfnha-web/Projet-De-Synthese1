@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Planning;
 use App\Models\PlanningSemaine;
+use App\Models\Stage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -259,6 +260,50 @@ class PlanningController extends Controller
     }
 
     // ────────────────────────────────────────────────────────────
+    // POST /api/plannings/{id}/redistribuer
+    // Sauvegarde UNE semaine (la cellule éditée), conserve toutes
+    // les autres cellules déjà remplies, et distribue le RESTANT
+    // sur les semaines vides non bloquées (toute l'année).
+    // Body: { semaine_num, mh_prevue }
+    // ────────────────────────────────────────────────────────────
+    public function redistribuer(Request $request, Planning $planning)
+    {
+        $request->validate([
+            'semaine_num' => 'required|integer|min:1|max:50',
+            'mh_prevue'   => 'required|numeric|min:0',
+        ]);
+
+        $editedNum = (int)$request->semaine_num;
+        $editedMh  = (float)$request->mh_prevue;
+        $allWeeks  = collect(self::getSemainesAnnee());
+
+        // Save the edited cell
+        $weekInfo = $allWeeks->firstWhere('num', $editedNum);
+        PlanningSemaine::updateOrCreate(
+            ['planning_id' => $planning->id, 'semaine_num' => $editedNum],
+            ['semestre' => $weekInfo['semestre'] ?? 1, 'mh_prevue' => $editedMh, 'statut' => null]
+        );
+
+        $planning->load('semaines');
+        $result = $this->doDistributeRestant($planning);
+
+        return response()->json(array_merge(['ok' => true], $result));
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // POST /api/plannings/{id}/distribuer-restant
+    // Distribue le RESTANT (mhDrif - déjà rempli) sur toutes les
+    // semaines vides non bloquées — sans toucher les cellules
+    // existantes. Appelé après la création d'un planning.
+    // ────────────────────────────────────────────────────────────
+    public function distribuerRestant(Planning $planning)
+    {
+        $planning->load('semaines');
+        $result = $this->doDistributeRestant($planning);
+        return response()->json(array_merge(['ok' => true], $result));
+    }
+
+    // ────────────────────────────────────────────────────────────
     // POST /api/plannings/{id}/auto-distribuer
     // Body: { charge_hebdo: 3 }
     // ────────────────────────────────────────────────────────────
@@ -279,6 +324,17 @@ class PlanningController extends Controller
             'mh_restante' => max(0, $planning->mh_drif - $totalPrevu),
             'semaines'    => $planning->semaines->pluck('mh_prevue', 'semaine_num'),
         ]);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // DELETE /api/plannings/all
+    // Supprime tous les plannings et leurs semaines
+    // ────────────────────────────────────────────────────────────
+    public function destroyAll()
+    {
+        PlanningSemaine::query()->delete();
+        Planning::query()->delete();
+        return response()->json(['message' => 'Tous les plannings supprimés avec succès']);
     }
 
     // ────────────────────────────────────────────────────────────
@@ -387,6 +443,104 @@ class PlanningController extends Controller
             'charge_hebdo' => $chargeHebdo,
             'mh_realisee'  => $totalPrevu,
         ]);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Retourne les numéros de semaines bloquées par les stages
+    // d'un groupe (même calcul que StageController::calcSemaines)
+    // ────────────────────────────────────────────────────────────
+    private function getStageWeeks(int $groupeId): array
+    {
+        $nums = [];
+        foreach (Stage::where('groupe_id', $groupeId)->get() as $stage) {
+            $debut  = $stage->date_debut;
+            $fin    = $stage->date_fin;
+            $annee  = $debut->month >= 9 ? $debut->year : $debut->year - 1;
+            $origin = Carbon::create($annee, 9, 1);
+            while ($origin->dayOfWeek !== Carbon::MONDAY) $origin->addDay();
+            $first = (int)$origin->diffInWeeks($debut->copy()->startOfWeek(Carbon::MONDAY)) + 1;
+            $last  = (int)$origin->diffInWeeks($fin->copy()->startOfWeek(Carbon::MONDAY))  + 1;
+            for ($i = $first; $i <= $last; $i++) $nums[] = $i;
+        }
+        return array_values(array_unique($nums));
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Distribue les heures restantes sur les semaines vides libres.
+    // Conserve toutes les cellules déjà remplies (mh_prevue > 0).
+    // ────────────────────────────────────────────────────────────
+    private function doDistributeRestant(Planning $planning): array
+    {
+        $allWeeks = collect(self::getSemainesAnnee());
+        $mhDrif   = (float)$planning->mh_drif;
+
+        // Blocked = absences + stages
+        $absentNums = $planning->semaines->where('statut', 'absent')->pluck('semaine_num')->toArray();
+        $stageNums  = $this->getStageWeeks($planning->groupe_id);
+        $blocked    = array_unique(array_merge($absentNums, $stageNums));
+
+        // Cells already filled — leave untouched
+        $filledNums  = $planning->semaines
+            ->filter(fn($s) => $s->statut !== 'absent' && (float)$s->mh_prevue > 0)
+            ->pluck('semaine_num')->toArray();
+
+        $totalFilled = $planning->semaines
+            ->filter(fn($s) => $s->statut !== 'absent' && (float)$s->mh_prevue > 0)
+            ->sum('mh_prevue');
+
+        $remaining = max(0.0, $mhDrif - (float)$totalFilled);
+
+        // Empty free weeks across the whole school year
+        $emptyFree = $allWeeks->filter(
+            fn($s) => !in_array($s['num'], $blocked) && !in_array($s['num'], $filledNums)
+        )->values();
+
+        $n = $emptyFree->count();
+
+        if ($remaining > 0 && $n > 0) {
+            $perWeek     = round($remaining / $n, 2);
+            $distributed = 0.0;
+            $rows        = [];
+
+            foreach ($emptyFree as $i => $sem) {
+                $mh = ($i === $n - 1) ? round($remaining - $distributed, 2) : $perWeek;
+                if ($mh <= 0) break;
+                $distributed += $mh;
+                $rows[] = [
+                    'planning_id' => $planning->id,
+                    'semaine_num' => $sem['num'],
+                    'semestre'    => $sem['semestre'],
+                    'mh_prevue'   => $mh,
+                    'statut'      => null,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ];
+            }
+
+            PlanningSemaine::where('planning_id', $planning->id)
+                ->whereIn('semaine_num', $emptyFree->pluck('num')->toArray())
+                ->delete();
+
+            if (!empty($rows)) PlanningSemaine::insert($rows);
+
+        } elseif ($remaining <= 0) {
+            // All hours already accounted for — clear leftover zero rows
+            PlanningSemaine::where('planning_id', $planning->id)
+                ->whereNotIn('semaine_num', $filledNums)
+                ->where(fn($q) => $q->whereNull('statut')->orWhere('statut', '!=', 'absent'))
+                ->delete();
+        }
+
+        $planning->load('semaines');
+        $totalPrevu = $planning->semaines->filter(fn($s) => $s->statut !== 'absent')->sum('mh_prevue');
+
+        return [
+            'semaines'    => $planning->semaines
+                ->filter(fn($s) => $s->statut !== 'absent')
+                ->pluck('mh_prevue', 'semaine_num'),
+            'total_prevu' => round((float)$totalPrevu, 2),
+            'mh_restante' => round(max(0.0, $mhDrif - (float)$totalPrevu), 2),
+        ];
     }
 
     private function getAnneeCourante(): int

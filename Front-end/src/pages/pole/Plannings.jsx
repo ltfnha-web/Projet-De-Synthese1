@@ -87,7 +87,7 @@ function calcChargeRecommandee(mhRestante, semestre) {
   return (mhRestante / semainesRestantes).toFixed(1);
 }
 
-function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cellSemestre, isStage, isAbsent }) {
+function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cellSemestre, isStage, isAbsent, stageWeeks }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal]         = useState(value ?? "");
   const [saving, setSaving]   = useState(false);
@@ -102,21 +102,19 @@ function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cell
     if (mh === (parseFloat(value) || 0)) { setEditing(false); return; }
     setSaving(true);
     try {
-      const res = await axios.put(`/plannings/${planningId}/semaine`, { semaine_num: semaineNum, mh_prevue: mh });
+      const res = await axios.post(`/plannings/${planningId}/redistribuer`, {
+        semaine_num: semaineNum,
+        mh_prevue:   mh,
+      });
       onSave(planningId, semaineNum, mh, {
-        total_prevu:      res.data.total_prevu,
-        mh_restante:      res.data.mh_restante,
-        avce:             res.data.avce,
-        masse_par_semaine: res.data.masse_par_semaine,
-        remaining_weeks:  res.data.remaining_weeks,
+        semaines:    res.data.semaines,
+        total_prevu: res.data.total_prevu,
+        mh_restante: res.data.mh_restante,
       });
     } catch { /* silently */ }
     setSaving(false);
     setEditing(false);
   };
-
-  // Semaine hors semestre du planning → grise neutre
-  if (hors) return <td style={{ background: "var(--sl1)", borderRight: "1px solid var(--border)", width: 32, minWidth: 32 }} />;
 
   // Semaine bloquée par un stage → grise hachurée + non cliquable
   if (isStage) return (
@@ -144,10 +142,16 @@ function CellSemaine({ planningId, semaineNum, value, onSave, planSemestre, cell
     />
   );
 
-  const bg = saving ? "rgba(26,82,118,.12)" : value > 0 ? "rgba(16,185,129,.09)" : undefined;
+  const bg = saving
+    ? "rgba(26,82,118,.12)"
+    : value > 0
+      ? hors ? "rgba(124,58,237,.13)" : "rgba(16,185,129,.09)"
+      : hors ? "rgba(124,58,237,.04)" : undefined;
 
   return (
-    <td onClick={() => setEditing(true)} style={{ padding: 0, width: 32, minWidth: 32, borderRight: "1px solid var(--border)", background: bg, cursor: "pointer", transition: "background .12s" }}>
+    <td onClick={() => setEditing(true)}
+      title={hors ? `Semaine hors semestre principal (débordement ${cellSemestre})` : undefined}
+      style={{ padding: 0, width: 32, minWidth: 32, borderRight: "1px solid var(--border)", background: bg, cursor: "pointer", transition: "background .12s" }}>
       {editing ? (
         <input ref={inputRef} type="number" min="0" max="20" step="0.5" value={val}
           onChange={e => setVal(e.target.value)} onBlur={commit}
@@ -174,8 +178,7 @@ function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, for
   const stageWeeks         = (stagesBloquees?.[String(p.groupe_id)] ?? []).map(Number);
   const absentWeeks        = (p.semaines_absentes ?? []).map(Number);
   const blockedWeeks       = [...new Set([...stageWeeks, ...absentWeeks])];
-  const semestreNum        = p.semestre === "S2" ? 2 : 1;
-  const semWeeks           = (semainesAnnee ?? []).filter(s => s.semestre === semestreNum);
+  const semWeeks           = semainesAnnee ?? [];
   const totalPrevuSansStage = Object.entries(p.semaines ?? {})
     .filter(([k]) => !blockedWeeks.includes(Number(k)))
     .reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
@@ -295,9 +298,9 @@ function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, for
       <td style={{ padding: "0 10px", borderRight: "2px solid var(--border)" }}>
         <AvcBar mhDrif={p.mh_drif} totalPrevu={totalPrevuSansStage} />
         {recCharge && (
-          <div title={`MH restante (${mhRestanteReelle}h) ÷ ${freeWeeks.length} sem. libres (hors stages)`}
+          <div title={`MH restante (${mhRestanteReelle}h) ÷ ${freeWeeks.length} sem. libres sur toute l'année (hors stages/absences)`}
                style={{ fontSize: 9, color: "var(--am6)", marginTop: 2, fontWeight: 600 }}>
-            Rec: {recCharge}h/sem ({freeWeeks.length} sem.)
+            Rec: {recCharge}h/sem ({freeWeeks.length} sem. libres)
           </div>
         )}
       </td>
@@ -336,7 +339,8 @@ function PlanningRow({ p, idx, semainesAffichees, semainesAnnee, premiereS2, for
           value={parseFloat(p.semaines?.[s.num]) || 0}
           planSemestre={p.semestre} cellSemestre={`S${s.semestre}`} onSave={onCellSave}
           isStage={stageWeeks.includes(s.num)}
-          isAbsent={!stageWeeks.includes(s.num) && absentWeeks.includes(s.num)} />
+          isAbsent={!stageWeeks.includes(s.num) && absentWeeks.includes(s.num)}
+          stageWeeks={stageWeeks} />
       ))}
       <td style={{ textAlign: "center", padding: "0 6px", whiteSpace: "nowrap" }}>
         {editing ? (
@@ -428,6 +432,7 @@ export default function Plannings() {
   const [filterGroupe, setFilterGroupe]   = useState("");
   const [filterSemestre, setFilterSemestre] = useState("");
   const [groupes, setGroupes]             = useState([]);
+  const [planningGroupes, setPlanningGroupes] = useState([]);
   const [modules, setModules]             = useState([]);
   const [formateurs, setFormateurs]       = useState([]);
   const FORM_INIT = { groupe_id: "", module_id: "", formateur_id: "", semestre: "S1", mh_drif: "", charge_hebdo: "", type: "Régionale", mode: "PRESENTIEL" };
@@ -453,12 +458,24 @@ export default function Plannings() {
       axios.get("/stages/semaines-bloquees"),
     ])
       .then(([planningsRes, stagesRes]) => {
-        setPlannings(planningsRes.data.plannings ?? []);
+        const fetched = planningsRes.data.plannings ?? [];
+        setPlannings(fetched);
         setSemainesAnnee(planningsRes.data.semaines_annee ?? []);
         setAnneeScolaire(planningsRes.data.annee_scolaire ?? "");
         setIsActive(planningsRes.data.is_active ?? null);
         setSemaineCourante(planningsRes.data.semaine_courante ?? null);
         setStagesBloquees(stagesRes.data ?? {});
+        if (!filterGroupe) {
+          const seen = new Set();
+          const derived = [];
+          fetched.forEach(p => {
+            if (!seen.has(p.groupe_id)) {
+              seen.add(p.groupe_id);
+              derived.push({ id: p.groupe_id, nom: p.groupe_nom });
+            }
+          });
+          setPlanningGroupes(derived);
+        }
       })
       .catch(() => flash("Impossible de charger les plannings. Vérifiez votre connexion et réessayez.", "err"))
       .finally(() => setLoading(false));
@@ -497,7 +514,7 @@ export default function Plannings() {
         mh_drif:       m.mh_drif ?? 0,
         formateur_id:  m.formateur_id ? String(m.formateur_id) : "",
         formateur_nom: m.formateur_id ? (formateursMap[m.formateur_id] ?? "") : "",
-        charge_hebdo:  calcChargeRecommandee(m.mh_drif, normSem(m.semestre)),
+        charge_hebdo:  calcCharge(m.mh_drif),
       }));
   };
 
@@ -520,7 +537,7 @@ export default function Plannings() {
   };
 
   const handleMhChange = (val) => {
-    setForm(p => ({ ...p, mh_drif: val, charge_hebdo: calcChargeRecommandee(parseFloat(val), p.semestre) }));
+    setForm(p => ({ ...p, mh_drif: val, charge_hebdo: calcCharge(val) }));
   };
 
   const submitForm = async () => {
@@ -537,7 +554,7 @@ export default function Plannings() {
     }
     setSaving(true);
     try {
-      await axios.post("/plannings", {
+      const createRes = await axios.post("/plannings", {
         groupe_id:    parseInt(form.groupe_id),
         module_id:    parseInt(form.module_id),
         formateur_id: parseInt(form.formateur_id),
@@ -547,6 +564,10 @@ export default function Plannings() {
         type:         form.type,
         mode:         form.mode,
       });
+      const newId = createRes.data?.data?.id;
+      if (newId) {
+        await axios.post(`/plannings/${newId}/distribuer-restant`);
+      }
       flash("Planning créé avec succès.");
       setModal(false);
       setForm(FORM_INIT);
@@ -613,12 +634,9 @@ export default function Plannings() {
   const handleCellSave = (planningId, semaineNum, mh, stats) => {
     setPlannings(prev => prev.map(p => p.id !== planningId ? p : {
       ...p,
-      semaines:          { ...p.semaines, [semaineNum]: mh },
-      total_prevu:       stats.total_prevu       ?? p.total_prevu,
-      mh_restante:       stats.mh_restante       ?? p.mh_restante,
-      avce:              stats.avce              ?? p.avce,
-      masse_par_semaine: stats.masse_par_semaine ?? p.masse_par_semaine,
-      remaining_weeks:   stats.remaining_weeks   ?? p.remaining_weeks,
+      semaines:    stats.semaines ?? { ...p.semaines, [semaineNum]: mh },
+      total_prevu: stats.total_prevu ?? p.total_prevu,
+      mh_restante: stats.mh_restante ?? p.mh_restante,
     }));
   };
 
@@ -633,6 +651,22 @@ export default function Plannings() {
     try {
       await axios.delete(`/plannings/${id}`);
       flash("Planning supprimé avec succès.");
+      fetchPlannings();
+    } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
+  };
+
+  const deleteAllPlannings = async () => {
+    const ok = await confirm({
+      title: "Supprimer tous les plannings ?",
+      message: "Tous les plannings et toutes les heures planifiées seront définitivement supprimés. Cette action est irréversible.",
+      confirmLabel: "Supprimer tous les plannings",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await axios.delete("/plannings/all");
+      flash("Tous les plannings supprimés avec succès.");
+      setPendingModules({});
       fetchPlannings();
     } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
   };
@@ -666,6 +700,11 @@ export default function Plannings() {
         </div>
         <div className="pg-actions">
           <button className="btn-secondary" onClick={fetchPlannings}>{Ico.refresh} Actualiser</button>
+          {plannings.length > 0 && (
+            <button className="btn-secondary" style={{ color: "var(--rd5)", borderColor: "var(--rd3)" }} onClick={deleteAllPlannings}>
+              {Ico.trash} Supprimer tous
+            </button>
+          )}
           <button className="btn-primary" onClick={() => { setForm(FORM_INIT); setModal(true); }}>{Ico.plus} Nouveau Planning</button>
         </div>
       </div>
@@ -720,7 +759,7 @@ export default function Plannings() {
             <span style={{ fontSize: 12, color: "var(--sl5)", display: "flex", alignItems: "center", gap: 5 }}>{Ico.filter} Filtres</span>
             <select className="form-select" style={{ width: 210, height: 34 }} value={filterGroupe} onChange={e => setFilterGroupe(e.target.value)}>
               <option value="">Tous les groupes</option>
-              {groupes.map(g => <option key={g.id} value={g.id}>{toStr(g.nom)}{g.filiere ? ` (${toStr(g.filiere)})` : ""}</option>)}
+              {planningGroupes.map(g => <option key={g.id} value={g.id}>{toStr(g.nom)}</option>)}
             </select>
             <select className="form-select" style={{ width: 150, height: 34 }} value={filterSemestre} onChange={e => setFilterSemestre(e.target.value)}>
               <option value="">Toute l'année</option>

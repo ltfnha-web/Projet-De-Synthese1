@@ -262,8 +262,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Absences formateurs
         Route::apiResource('absences', FormateurAbsenceController::class);
 
-        Route::put('/plannings/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
-        Route::post('/plannings/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
+        Route::put('/plannings/{planning}/semaine',              [PlanningController::class, 'updateSemaine']);
+        Route::post('/plannings/{planning}/redistribuer',       [PlanningController::class, 'redistribuer']);
+        Route::post('/plannings/{planning}/distribuer-restant', [PlanningController::class, 'distribuerRestant']);
+        Route::post('/plannings/{planning}/auto-distribuer',    [PlanningController::class, 'autoDistribuerRoute']);
 
         // Emplois du temps (formateurs)
         Route::post('/formateur-emplois',       [FormateurEmploiController::class, 'store']);
@@ -284,12 +286,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Plannings
         Route::prefix('plannings')->group(function () {
-            Route::get('/',                            [PlanningController::class, 'index']);
-            Route::post('/',                           [PlanningController::class, 'store']);
-            Route::put('/{planning}',                  [PlanningController::class, 'update']);
-            Route::delete('/{planning}',               [PlanningController::class, 'destroy']);
-            Route::put('/{planning}/semaine',          [PlanningController::class, 'updateSemaine']);
-            Route::post('/{planning}/auto-distribuer', [PlanningController::class, 'autoDistribuerRoute']);
+            Route::get('/',                                [PlanningController::class, 'index']);
+            Route::post('/',                               [PlanningController::class, 'store']);
+            Route::delete('/all',                          [PlanningController::class, 'destroyAll']);
+            Route::put('/{planning}',                      [PlanningController::class, 'update']);
+            Route::delete('/{planning}',                   [PlanningController::class, 'destroy']);
+            Route::put('/{planning}/semaine',              [PlanningController::class, 'updateSemaine']);
+            Route::post('/{planning}/redistribuer',        [PlanningController::class, 'redistribuer']);
+            Route::post('/{planning}/distribuer-restant',  [PlanningController::class, 'distribuerRestant']);
+            Route::post('/{planning}/auto-distribuer',     [PlanningController::class, 'autoDistribuerRoute']);
         });
 
         // Salles — disponibles MUST come before /{id}

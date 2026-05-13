@@ -240,7 +240,13 @@ class UserController extends Controller
             if ($secteurId) $query->where('filieres.secteur_id', $secteurId);
             if ($creneau)   $query->where('groupes.creneau', $creneau);
             if ($annee)     $query->where('groupes.annee_formation', $annee);
-            if ($examType)  $query->whereIn('modules.type_formation', $examTypeSynonyms[$examType] ?? [$examType]);
+            if ($examType) {
+                $synonyms = $examTypeSynonyms[$examType] ?? [$examType];
+                $query->where(function ($q) use ($synonyms) {
+                    $q->whereIn('modules.type_formation', $synonyms)
+                      ->orWhereIn('modules.eg_et', $synonyms);
+                });
+            }
             if ($groupeId)  $query->where('groupes.id', $groupeId);
             if ($moduleId)  $query->where('modules.id', $moduleId);
             return $query;
@@ -261,7 +267,8 @@ class UserController extends Controller
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
-                    ->whereIn('modules.type_formation', $examValues)
+                    ->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
+                                         ->orWhereIn('modules.eg_et', $examValues))
             ))
             ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->when($moduleId,   fn($q) => $q->whereExists(
@@ -276,7 +283,8 @@ class UserController extends Controller
             ->when($secteurId,  fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
             ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examValues, fn($q) => $q->whereIn('modules.type_formation', $examValues))
+            ->when($examValues, fn($q) => $q->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
+                                                                    ->orWhereIn('modules.eg_et', $examValues)))
             ->when($groupeId,   fn($q) => $q->where('modules.groupe_id', $groupeId))
             ->when($moduleId,   fn($q) => $q->where('modules.id', $moduleId));
 
@@ -359,7 +367,8 @@ class UserController extends Controller
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
-                    ->whereIn('modules.type_formation', $examValues)
+                    ->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
+                                         ->orWhereIn('modules.eg_et', $examValues))
             ))
             ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->groupBy('groupes.annee_formation')
@@ -373,7 +382,8 @@ class UserController extends Controller
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
             ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examValues, fn($q) => $q->whereIn('modules.type_formation', $examValues))
+            ->when($examValues, fn($q) => $q->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
+                                                                    ->orWhereIn('modules.eg_et', $examValues)))
             ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->when($moduleId,   fn($q) => $q->where('modules.id', $moduleId))
             ->select(
