@@ -2,24 +2,23 @@ import { createContext, useContext, useState } from "react";
 
 const FilterContext = createContext(null);
 
-// Labels for raw DB values stored in eg_et and type_formation columns
+// Normalise raw TYPE EXAMEN values (col BO) to readable labels
 export const EXAM_TYPE_LABELS = {
-  "EG":         "Examen Général (EG)",
-  "ET":         "Examen Technique (ET)",
-  "EG/ET":      "EG / ET",
-  "Diplômante": "Diplômante",
-  "Diplomante": "Diplômante",
-  "Qualifiante":"Qualifiante",
+  "Fin Formation":       "Fin de Formation",
+  "Fin Formation(S5)":   "Fin de Formation (S5)",
+  "Formation Qualifiante": "Formation Qualifiante",
+  "Passage (1A)":        "Passage (1ère Année)",
+  "Passage (2A)":        "Passage (2ème Année)",
 };
 
-// Fallback hardcoded options (used only if API returns no exam_types_list)
+// Fallback options shown when API returns no exam_types_list (before first import)
 export const EXAM_TYPE_OPTIONS = [
-  { value: "",           label: "Tous types d'examen"    },
-  { value: "EG",         label: "Examen Général (EG)"    },
-  { value: "ET",         label: "Examen Technique (ET)"  },
-  { value: "EG/ET",      label: "EG / ET"                },
-  { value: "Diplômante", label: "Diplômante"             },
-  { value: "Qualifiante",label: "Qualifiante"            },
+  { value: "",                     label: "Tous types d'examen"       },
+  { value: "Passage (1A)",         label: "Passage (1ère Année)"      },
+  { value: "Passage (2A)",         label: "Passage (2ème Année)"      },
+  { value: "Fin Formation",        label: "Fin de Formation"           },
+  { value: "Fin Formation(S5)",    label: "Fin de Formation (S5)"      },
+  { value: "Formation Qualifiante",label: "Formation Qualifiante"      },
 ];
 
 // Returns a human-readable label for a raw DB value

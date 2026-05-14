@@ -43,6 +43,7 @@ class ImportController extends Controller
      * [53] MH DRIF DISTANCIEL OK
      * [55] TX AVC MOD
      * [62] MH RESTANTE
+     * [66] TYPE EXAMEN (colonne BO)
      */
     public function import(Request $request)
     {
@@ -228,7 +229,7 @@ class ImportController extends Controller
                 [
                     'intitule'               => $nomModule,
                     'formateur_id'           => $formateurId,
-                    'type_formation'         => $v(6),
+                    'type_formation'         => $v(66),
                     'mh_drif'                => $n(51),
                     'mh_drif_presentiel'     => $n(52),
                     'mh_drif_distanciel'     => $n(53),

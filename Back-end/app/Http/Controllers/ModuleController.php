@@ -55,13 +55,12 @@ class ModuleController extends Controller
                     ? $q->where('mh_realisee_globale', '>', 0)
                     : $q->where('mh_realisee_globale', 0)
             )
-            ->when(!$request->filled('exam_type') && $request->type_formation, fn($q) =>
+            ->when($request->type_formation, fn($q) =>
                 $q->where('type_formation', $request->type_formation)
             )
-            ->when($request->filled('exam_type') && $request->exam_type !== '', function ($q) use ($request) {
-                $examType = $request->exam_type;
-                $q->where(fn($sq) => $sq->where('eg_et', $examType)->orWhere('type_formation', $examType));
-            })
+            ->when($request->filled('exam_type') && $request->exam_type !== '', fn($q) =>
+                $q->where('eg_et', $request->exam_type)
+            )
             ->latest();
 
         return response()->json($query->paginate(15));

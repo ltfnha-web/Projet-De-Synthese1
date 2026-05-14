@@ -234,10 +234,7 @@ class UserController extends Controller
             if ($creneau)   $query->where('groupes.creneau', $creneau);
             if ($annee)     $query->where('groupes.annee_formation', $annee);
             if ($examType) {
-                $query->where(function ($q) use ($examType) {
-                    $q->where('modules.eg_et', $examType)
-                      ->orWhere('modules.type_formation', $examType);
-                });
+                $query->where('modules.type_formation', $examType);
             }
             if ($groupeId)  $query->where('groupes.id', $groupeId);
             if ($moduleId)  $query->where('modules.id', $moduleId);
@@ -259,8 +256,7 @@ class UserController extends Controller
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
-                    ->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
-                                         ->orWhereIn('modules.eg_et', $examValues))
+                    ->whereIn('modules.type_formation', $examValues)
             ))
             ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->when($moduleId,   fn($q) => $q->whereExists(
@@ -275,8 +271,7 @@ class UserController extends Controller
             ->when($secteurId,  fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
             ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examValues, fn($q) => $q->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
-                                                                    ->orWhereIn('modules.eg_et', $examValues)))
+            ->when($examValues, fn($q) => $q->whereIn('modules.type_formation', $examValues))
             ->when($groupeId,   fn($q) => $q->where('modules.groupe_id', $groupeId))
             ->when($moduleId,   fn($q) => $q->where('modules.id', $moduleId));
 
@@ -359,8 +354,7 @@ class UserController extends Controller
                 fn($sub) => $sub->select(DB::raw(1))
                     ->from('modules')
                     ->whereColumn('modules.groupe_id', 'groupes.id')
-                    ->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
-                                         ->orWhereIn('modules.eg_et', $examValues))
+                    ->whereIn('modules.type_formation', $examValues)
             ))
             ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->groupBy('groupes.annee_formation')
@@ -374,8 +368,7 @@ class UserController extends Controller
             ->when($secteurId, fn($q) => $q->where('filieres.secteur_id', $secteurId))
             ->when($creneau,    fn($q) => $q->where('groupes.creneau', $creneau))
             ->when($annee,      fn($q) => $q->where('groupes.annee_formation', $annee))
-            ->when($examValues, fn($q) => $q->where(fn($sq) => $sq->whereIn('modules.type_formation', $examValues)
-                                                                    ->orWhereIn('modules.eg_et', $examValues)))
+            ->when($examValues, fn($q) => $q->whereIn('modules.type_formation', $examValues))
             ->when($groupeId,   fn($q) => $q->where('groupes.id', $groupeId))
             ->when($moduleId,   fn($q) => $q->where('modules.id', $moduleId))
             ->select(
@@ -400,22 +393,12 @@ class UserController extends Controller
 
         $secteursList = Secteur::select('id', 'nom')->orderBy('nom')->get();
 
-        // Exclude known garbage values that come from accidental header-row imports
-        $excludeValues = ['Type de formation'];
-
-        $examTypesList = collect()
-            ->merge(
-                DB::table('modules')->whereNotNull('eg_et')
-                    ->where('eg_et', '!=', '')->whereNotIn('eg_et', $excludeValues)
-                    ->distinct()->pluck('eg_et')
-            )
-            ->merge(
-                DB::table('modules')->whereNotNull('type_formation')
-                    ->where('type_formation', '!=', '')->whereNotIn('type_formation', $excludeValues)
-                    ->distinct()->pluck('type_formation')
-            )
-            ->unique()
-            ->sort()
+        $examTypesList = DB::table('modules')
+            ->whereNotNull('type_formation')
+            ->where('type_formation', '!=', '')
+            ->distinct()
+            ->orderBy('type_formation')
+            ->pluck('type_formation')
             ->values();
 
         $groupesList = [];
