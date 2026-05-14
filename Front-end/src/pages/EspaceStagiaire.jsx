@@ -146,8 +146,9 @@ function StatutBadge({ statut }) {
   );
 }
 
+
 /* ═══════════════════════════════════════════════════════════════════════
-   PAGE PRINCIPALE
+  PAGE PRINCIPALE
 ═══════════════════════════════════════════════════════════════════════ */
 export default function EspaceStagiaire() {
   const { user, logout } = useAuth();

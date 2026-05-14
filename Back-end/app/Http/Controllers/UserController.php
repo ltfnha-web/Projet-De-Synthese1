@@ -229,22 +229,14 @@ class UserController extends Controller
         $groupeId  = $request->groupe_id;
         $moduleId  = $request->module_id;
 
-        $examTypeSynonyms = [
-            'Fin de Formation' => ['Fin de Formation', 'EFF', 'Fin Formation'],
-            'Passage'          => ['Passage', 'EFP'],
-            'Qualifiante'      => ['Qualifiante'],
-            'Diplômante'       => ['Diplômante', 'Diplomante'],
-        ];
-
-        $applyFilters = function ($query) use ($secteurId, $creneau, $annee, $examType, $groupeId, $moduleId, $examTypeSynonyms) {
+        $applyFilters = function ($query) use ($secteurId, $creneau, $annee, $examType, $groupeId, $moduleId) {
             if ($secteurId) $query->where('filieres.secteur_id', $secteurId);
             if ($creneau)   $query->where('groupes.creneau', $creneau);
             if ($annee)     $query->where('groupes.annee_formation', $annee);
             if ($examType) {
-                $synonyms = $examTypeSynonyms[$examType] ?? [$examType];
-                $query->where(function ($q) use ($synonyms) {
-                    $q->whereIn('modules.type_formation', $synonyms)
-                      ->orWhereIn('modules.eg_et', $synonyms);
+                $query->where(function ($q) use ($examType) {
+                    $q->where('modules.eg_et', $examType)
+                      ->orWhere('modules.type_formation', $examType);
                 });
             }
             if ($groupeId)  $query->where('groupes.id', $groupeId);
@@ -257,7 +249,7 @@ class UserController extends Controller
             ->join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->join('secteurs', 'filieres.secteur_id','=', 'secteurs.id');
 
-        $examValues = $examType ? ($examTypeSynonyms[$examType] ?? [$examType]) : null;
+        $examValues = $examType ? [$examType] : null;
 
         $groupeScope = Groupe::join('filieres', 'groupes.filiere_id', '=', 'filieres.id')
             ->when($secteurId,  fn($q) => $q->where('filieres.secteur_id', $secteurId))
@@ -408,12 +400,23 @@ class UserController extends Controller
 
         $secteursList = Secteur::select('id', 'nom')->orderBy('nom')->get();
 
-        $examTypesList = DB::table('modules')
-            ->whereNotNull('type_formation')
-            ->where('type_formation', '!=', '')
-            ->distinct()
-            ->orderBy('type_formation')
-            ->pluck('type_formation');
+        // Exclude known garbage values that come from accidental header-row imports
+        $excludeValues = ['Type de formation'];
+
+        $examTypesList = collect()
+            ->merge(
+                DB::table('modules')->whereNotNull('eg_et')
+                    ->where('eg_et', '!=', '')->whereNotIn('eg_et', $excludeValues)
+                    ->distinct()->pluck('eg_et')
+            )
+            ->merge(
+                DB::table('modules')->whereNotNull('type_formation')
+                    ->where('type_formation', '!=', '')->whereNotIn('type_formation', $excludeValues)
+                    ->distinct()->pluck('type_formation')
+            )
+            ->unique()
+            ->sort()
+            ->values();
 
         $groupesList = [];
         if ($secteurId) {

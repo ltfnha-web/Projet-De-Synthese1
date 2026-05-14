@@ -90,4 +90,11 @@ class FormateurEmploiController extends Controller
         FormateurEmploi::findOrFail($id)->delete();
         return response()->json(['message' => 'Supprimé.']);
     }
+
+    public function destroyAll()
+    {
+        $count = FormateurEmploi::count();
+        FormateurEmploi::query()->delete();
+        return response()->json(['message' => "{$count} emploi(s) de formateur(s) supprimé(s)."]);
+    }
 }

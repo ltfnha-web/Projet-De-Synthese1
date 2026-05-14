@@ -2,27 +2,30 @@ import { createContext, useContext, useState } from "react";
 
 const FilterContext = createContext(null);
 
-export const EXAM_TYPE_OPTIONS = [
-  { value: "",                 label: "Tous types d'examen" },
-  { value: "Fin de Formation", label: "Fin de Formation"    },
-  { value: "Passage",          label: "Passage"              },
-  { value: "Qualifiante",      label: "Qualifiante"          },
-  { value: "Diplômante",       label: "Diplômante"           },
-];
-
-// Synonym map: DB may store EFF / "Fin Formation" — normalise to the canonical value
-const SYNONYMS = {
-  EFF:              "Fin de Formation",
-  "Fin Formation":  "Fin de Formation",
-  EFP:              "Passage",
-  Qualifiante:      "Qualifiante",
-  Diplômante:       "Diplômante",
-  Diplomante:       "Diplômante",
+// Labels for raw DB values stored in eg_et and type_formation columns
+export const EXAM_TYPE_LABELS = {
+  "EG":         "Examen Général (EG)",
+  "ET":         "Examen Technique (ET)",
+  "EG/ET":      "EG / ET",
+  "Diplômante": "Diplômante",
+  "Diplomante": "Diplômante",
+  "Qualifiante":"Qualifiante",
 };
 
+// Fallback hardcoded options (used only if API returns no exam_types_list)
+export const EXAM_TYPE_OPTIONS = [
+  { value: "",           label: "Tous types d'examen"    },
+  { value: "EG",         label: "Examen Général (EG)"    },
+  { value: "ET",         label: "Examen Technique (ET)"  },
+  { value: "EG/ET",      label: "EG / ET"                },
+  { value: "Diplômante", label: "Diplômante"             },
+  { value: "Qualifiante",label: "Qualifiante"            },
+];
+
+// Returns a human-readable label for a raw DB value
 export function normaliseExamType(raw) {
   if (!raw) return "";
-  return SYNONYMS[raw] ?? SYNONYMS[raw.trim()] ?? raw;
+  return EXAM_TYPE_LABELS[raw] ?? EXAM_TYPE_LABELS[raw.trim()] ?? raw;
 }
 
 export function FilterProvider({ children }) {

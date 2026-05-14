@@ -59,15 +59,8 @@ class ModuleController extends Controller
                 $q->where('type_formation', $request->type_formation)
             )
             ->when($request->filled('exam_type') && $request->exam_type !== '', function ($q) use ($request) {
-                // Canonical → DB synonym map
-                $synonyms = [
-                    'Fin de Formation' => ['Fin de Formation', 'EFF', 'Fin Formation'],
-                    'Passage'          => ['Passage', 'EFP'],
-                    'Qualifiante'      => ['Qualifiante'],
-                    'Diplômante'       => ['Diplômante', 'Diplomante'],
-                ];
-                $values = $synonyms[$request->exam_type] ?? [$request->exam_type];
-                $q->whereIn('type_formation', $values);
+                $examType = $request->exam_type;
+                $q->where(fn($sq) => $sq->where('eg_et', $examType)->orWhere('type_formation', $examType));
             })
             ->latest();
 

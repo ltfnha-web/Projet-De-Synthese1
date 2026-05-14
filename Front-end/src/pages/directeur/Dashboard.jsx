@@ -192,8 +192,23 @@ export default function DirecteurDashboard() {
   const handleSecteurChange = (v) => { setFSecteur(v); setFGroupe(""); setFModule(""); };
   const handleGroupeChange  = (v) => { setFGroupe(v);  setFModule(""); };
 
-  const getExamLabel = (t) => EXAM_TYPE_OPTIONS.find(o => o.value === normaliseExamType(t))?.label || t || "Tous";
-  const examTypeOpts = EXAM_TYPE_OPTIONS;
+  const getExamLabel = (t) => normaliseExamType(t) || t || "Tous";
+
+  // Build dropdown from real DB values; filter out garbage header row artifact
+  const GARBAGE_VALUES = new Set(["Type de formation"]);
+  const examTypeOpts = (() => {
+    const rawList = (stats?.exam_types_list ?? []).filter(v => !GARBAGE_VALUES.has(v));
+    if (!rawList.length) return EXAM_TYPE_OPTIONS;
+    const seen = new Set();
+    const opts = [{ value: "", label: "Tous types d'examen" }];
+    rawList.forEach(raw => {
+      if (!seen.has(raw)) {
+        seen.add(raw);
+        opts.push({ value: raw, label: normaliseExamType(raw) || raw });
+      }
+    });
+    return opts;
+  })();
 
   const hasFilters = fSecteur || fCreneau || fAnnee || fSeuil || fGroupe || fModule || fExamType;
   const resetAll   = () => { setFSecteur(""); setFCreneau(""); setFAnnee(""); setFSeuil(""); setFGroupe(""); setFModule(""); setFExamType(""); };

@@ -33,6 +33,7 @@ const Ico = {
   print: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
   cal:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   table: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/><line x1="15" y1="9" x2="15" y2="21"/></svg>,
+  trash: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
 };
 
 function calcNbHeures(jours) {
@@ -935,6 +936,7 @@ export default function Emplois() {
   // Emploi à modifier (bouton Modifier emploi)
   const [emploiAModifier, setEmploiAModifier] = useState(null);
   const [generatingAll, setGeneratingAll]     = useState(false);
+  const [filterGroupeEmploi, setFilterGroupeEmploi] = useState("");
 
   const [confirm, ConfirmDialog] = useConfirm();
   const flash = (msg, type = "ok") => { setAlert({ msg, type }); setTimeout(() => setAlert(null), 4000); };
@@ -1027,6 +1029,40 @@ export default function Emplois() {
     } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
   };
 
+  const supprimerTousEmploisGroupe = async () => {
+    if (!filterGroupeEmploi) { flash("Sélectionnez un groupe.", "err"); return; }
+    const groupeNom = emplois.find(e => String(e.groupe_id) === String(filterGroupeEmploi))?.groupe ?? `Groupe #${filterGroupeEmploi}`;
+    const ok = await confirm({
+      title: `Supprimer les emplois de ${groupeNom} ?`,
+      message: `Tous les emplois du temps du groupe ${groupeNom} seront définitivement supprimés. Cette action est irréversible.`,
+      confirmLabel: `Supprimer les emplois de ${groupeNom}`,
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await axios.delete(`/emplois/groupe/${filterGroupeEmploi}`);
+      flash(`Emplois du groupe ${groupeNom} supprimés.`);
+      setFilterGroupeEmploi("");
+      if (emploiActif && String(emploiActif.groupe_id) === String(filterGroupeEmploi)) setEmploiActif(null);
+      fetchAll();
+    } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
+  };
+
+  const supprimerTousEmploisFormateurs = async () => {
+    const ok = await confirm({
+      title: "Supprimer tous les emplois formateurs ?",
+      message: "Tous les emplois du temps des formateurs seront définitivement supprimés. Cette action est irréversible.",
+      confirmLabel: "Supprimer tous les emplois formateurs",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await axios.delete("/formateur-emplois/all");
+      flash("Tous les emplois formateurs supprimés.");
+      fetchAll();
+    } catch { flash("La suppression a échoué. Veuillez réessayer.", "err"); }
+  };
+
   const handlePrint = () => {
     openPrintWindow("emploi-doc-content", `Emploi du temps — ${toStr(emploiActif?.groupe ?? "")}`);
   };
@@ -1042,7 +1078,44 @@ export default function Emplois() {
             {emplois.length} emploi{emplois.length > 1 ? "s" : ""} enregistré{emplois.length > 1 ? "s" : ""}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Supprimer emplois d'un groupe */}
+          {emplois.length > 0 && (() => {
+            const emploiGroupes = [...new Map(emplois.map(e => [e.groupe_id, { id: e.groupe_id, nom: e.groupe }])).values()];
+            return (
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <select
+                  className="form-select"
+                  style={{ height: 34, fontSize: 13, minWidth: 160 }}
+                  value={filterGroupeEmploi}
+                  onChange={e => setFilterGroupeEmploi(e.target.value)}
+                >
+                  <option value="">Choisir un groupe</option>
+                  {emploiGroupes.map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}
+                </select>
+                <button
+                  className="sp-btn sp-btn--secondary"
+                  style={{ color: "var(--rd5, #dc2626)", borderColor: "var(--rd3, #fca5a5)" }}
+                  onClick={supprimerTousEmploisGroupe}
+                  disabled={!filterGroupeEmploi}
+                  title="Supprimer tous les emplois du groupe sélectionné"
+                >
+                  {Ico.trash} Supprimer emplois groupe
+                </button>
+              </div>
+            );
+          })()}
+          {/* Supprimer tous les emplois formateurs */}
+          {formateurEmplois.length > 0 && (
+            <button
+              className="sp-btn sp-btn--secondary"
+              style={{ color: "var(--rd5, #dc2626)", borderColor: "var(--rd3, #fca5a5)" }}
+              onClick={supprimerTousEmploisFormateurs}
+              title="Supprimer tous les emplois des formateurs"
+            >
+              {Ico.trash} Supprimer emplois formateurs
+            </button>
+          )}
           {/* Générer tous les emplois formateurs en un clic */}
           <button className="sp-btn sp-btn--secondary" onClick={genererTousEmploisFormateurs} disabled={generatingAll}
             title="Génère automatiquement les emplois de tous les formateurs depuis les emplois du temps existants">

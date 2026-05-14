@@ -15,6 +15,7 @@ use App\Http\Controllers\FormateurEmploiController;
 use App\Http\Controllers\SalleController;
 use App\Http\Controllers\StageController;
 use App\Http\Controllers\FormateurAbsenceController;
+use App\Http\Controllers\SemaineAcademiqueController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
@@ -69,9 +70,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me',      [AuthController::class, 'me']);
 
+    // ── Semaines académiques (read: all authenticated roles) ──
+    Route::get('/semaines-academiques', [SemaineAcademiqueController::class, 'index']);
+
     // ── DIRECTEUR ──
     Route::middleware('role:directeur')->group(function () {
         Route::get('/stats', [UserController::class, 'stats']);
+
+        // Semaines académiques — generation & deletion (admin only)
+        Route::post('/semaines-academiques/generate',         [SemaineAcademiqueController::class, 'generate']);
+        Route::delete('/semaines-academiques/{anneeScolaire}',[SemaineAcademiqueController::class, 'destroy']);
 
         // ⚠️  /users/options DOIT être AVANT apiResource (sinon Laravel
         //     interprète "options" comme un {user} et retourne 404)
@@ -268,10 +276,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/plannings/{planning}/auto-distribuer',    [PlanningController::class, 'autoDistribuerRoute']);
 
         // Emplois du temps (formateurs)
-        Route::post('/formateur-emplois',       [FormateurEmploiController::class, 'store']);
-        Route::get('/formateur-emplois',        [FormateurEmploiController::class, 'index']);
-        Route::get('/formateur-emplois/{id}',   [FormateurEmploiController::class, 'show']);
-        Route::delete('/formateur-emplois/{id}',[FormateurEmploiController::class, 'destroy']);
+        Route::post('/formateur-emplois',        [FormateurEmploiController::class, 'store']);
+        Route::get('/formateur-emplois',         [FormateurEmploiController::class, 'index']);
+        Route::get('/formateur-emplois/{id}',    [FormateurEmploiController::class, 'show']);
+        Route::delete('/formateur-emplois/all',  [FormateurEmploiController::class, 'destroyAll']);
+        Route::delete('/formateur-emplois/{id}', [FormateurEmploiController::class, 'destroy']);
 
         // Emplois du temps
         Route::prefix('emplois')->group(function () {
@@ -279,6 +288,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/',                        [EmploiController::class, 'store']);
             Route::post('/generate-from-plannings', [EmploiController::class, 'generateFromPlannings']);
             Route::get('/formateur/{formateurId}',  [EmploiController::class, 'formateurTimetable']);
+            Route::delete('/groupe/{groupeId}',     [EmploiController::class, 'destroyByGroupe']);
             Route::get('/{id}',                     [EmploiController::class, 'show']);
             Route::put('/{id}',                     [EmploiController::class, 'update']);
             Route::delete('/{id}',                  [EmploiController::class, 'destroy']);

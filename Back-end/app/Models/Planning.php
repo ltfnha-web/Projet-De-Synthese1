@@ -31,7 +31,7 @@ class Planning extends Model
         'mh_realisee'     => 'integer',
         'nb_semaines'     => 'integer',
         'semaines_faites' => 'integer',
-        'charge_hebdo'    => 'integer',
+        'charge_hebdo'    => 'float',
         'seance_numero'   => 'integer',
     ];
 

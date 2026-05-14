@@ -273,6 +273,17 @@ class EmploiController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // DELETE /api/emplois/groupe/{groupeId}
+    // ─────────────────────────────────────────────────────────────────────────
+    public function destroyByGroupe($groupeId)
+    {
+        $emplois = EmploiDuTemps::where('groupe_id', $groupeId)->get();
+        $count   = $emplois->count();
+        $emplois->each->delete();
+        return response()->json(['message' => "{$count} emploi(s) du groupe supprimé(s)."]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // GET /api/emplois/formateur/{formateurId}
     // ─────────────────────────────────────────────────────────────────────────
     public function formateurTimetable($formateurId)
