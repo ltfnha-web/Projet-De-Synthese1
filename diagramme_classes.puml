@@ -1,0 +1,316 @@
+@startuml Diagramme_Classes
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2E86C1
+skinparam classHeaderBackgroundColor #2E86C1
+skinparam classHeaderFontColor #FFFFFF
+skinparam classAttributeFontColor #1A252F
+skinparam ArrowColor #2C3E50
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam linetype ortho
+skinparam ClassFontSize 13
+skinparam ClassAttributeFontSize 12
+
+title Diagramme de Classes\nPlateforme de Gestion Pédagogique — ISTA Hay Salam
+
+' ═══════════════════════════════════════════════
+'  ÉNUMÉRATIONS
+' ═══════════════════════════════════════════════
+enum Role {
+  directeur
+  pole
+  formateur
+  stagiaire
+  surveillant
+}
+
+enum Semestre {
+  S1
+  S2
+}
+
+enum ModeFormation {
+  PRESENTIEL
+  DISTANCIEL
+}
+
+enum StatutGroupe {
+  Actif
+  Inactif
+}
+
+enum ModeGroupe {
+  Résidentiel
+  Alternance
+}
+
+enum StatutStage {
+  Planifié
+  EnCours
+  Terminé
+}
+
+' ═══════════════════════════════════════════════
+'  CLASSES PRINCIPALES
+' ═══════════════════════════════════════════════
+
+class Utilisateur {
+  - id            : int
+  - nom           : string
+  - email         : string
+  - motDePasse    : string
+  - role          : Role
+  - estActif      : boolean
+  - specialite    : string
+  - telephone     : string
+  - statut        : string
+  --
+  + seConnecter() : bool
+  + seDeconnecter() : void
+  + getRole() : Role
+}
+
+class Secteur {
+  - id  : int
+  - nom : string
+  --
+  + getFilières() : List<Filière>
+  + getCoordinateur() : PoleSecteur
+}
+
+class Filiere {
+  - id       : int
+  - code     : string
+  - intitule : string
+  --
+  + getGroupes() : List<Groupe>
+}
+
+class Groupe {
+  - id             : int
+  - nom            : string
+  - anneeFormation : int
+  - effectif       : int
+  - statut         : StatutGroupe
+  - mode           : ModeGroupe
+  - creneau        : string
+  --
+  + getModules() : List<Module>
+  + getEmploisDuTemps() : List<EmploiDuTemps>
+  + getStages() : List<Stage>
+}
+
+class Formateur {
+  - id     : int
+  - mle    : string
+  - nom    : string
+  - statut : string
+  --
+  + getModules() : List<Module>
+  + getPlannings() : List<Planning>
+  + getAbsences() : List<FormateurAbsence>
+  + getEmploisDuTemps() : List<FormateurEmploi>
+}
+
+class Module {
+  - id                   : int
+  - code                 : string
+  - intitule             : string
+  - mhDrif               : float
+  - mhDrifPresentiel     : float
+  - mhDrifDistanciel     : float
+  - mhRealisee           : float
+  - mhRestante           : float
+  - tauxRealisation      : float
+  - txAvancement         : float
+  - semestre             : Semestre
+  - typeFormation        : string
+  - estRegional          : boolean
+  - creneau              : string
+  - validationEfm        : boolean
+  - seanceEfm            : int
+  --
+  + calculerTauxRealisation() : float
+  + calculerHeuresRestantes() : float
+}
+
+class Planning {
+  - id          : int
+  - semestre    : Semestre
+  - type        : string
+  - mhDrif      : float
+  - mhRealisee  : float
+  - dateDebut   : date
+  - nbSemaines  : int
+  - chargeHebdo : float
+  - statut      : string
+  - jour        : string
+  - seanceNum   : int
+  - salle       : string
+  - mode        : ModeFormation
+  --
+  + distribuerAutomatiquement() : void
+  + redistribuerHeures() : void
+  + calculerAvancement() : float
+}
+
+class PlanningSemaine {
+  - id         : int
+  - semaineNum : int
+  - semestre   : int
+  - mhPrevue   : float
+  - statut     : string
+  --
+  + getTotalHeures() : float
+}
+
+class EmploiDuTemps {
+  - id               : int
+  - periodDebut      : date
+  - semestre         : int
+  - semaineNum       : int
+  - grille           : JSON
+  - valide           : boolean
+  - formateurParrain : string
+  - signaireNom      : string
+  --
+  + genererDepuisPlannings() : void
+  + valider() : void
+  + imprimer() : void
+}
+
+class EmploiSeance {
+  - id          : int
+  - jour        : string
+  - numeroSeance: int
+  - semestre    : int
+  - mode        : ModeFormation
+  --
+  + verifierConflits() : bool
+}
+
+class FormateurEmploi {
+  - id          : int
+  - semestre    : int
+  - grille      : JSON
+  - signaireNom : string
+  --
+  + imprimer() : void
+}
+
+class FormateurAbsence {
+  - id        : int
+  - dateDebut : date
+  - dateFin   : date
+  - cause     : string
+  - nbHeures  : float
+  --
+  + getNbSemaines() : int
+  + chevaucheSeance(date: date) : bool
+}
+
+class Salle {
+  - id       : int
+  - nom      : string
+  - secteur  : string
+  - capacite : int
+  - type     : string
+  - actif    : boolean
+  --
+  + estDisponible(jour: string, seance: int, semestre: int) : bool
+}
+
+class PoleSecteur {
+  - id    : int
+  - notes : string
+  --
+  + getFormateur() : Formateur
+  + getSecteur() : Secteur
+}
+
+class Stage {
+  - id              : int
+  - dateDebut       : date
+  - dateFin         : date
+  - statut          : StatutStage
+  - semainesBloquees: int
+  --
+  + calculerDuree() : int
+  + estEnCours(date: date) : bool
+}
+
+class SemaineAcademique {
+  - id            : int
+  - anneeScolaire : string
+  - semaineNum    : int
+  - dateDebut     : date
+  - dateFin       : date
+  - semestre      : int
+  - label         : string
+  --
+  + getDateLundi() : date
+  + getDateDimanche() : date
+  + estDansSemestre(s: int) : bool
+}
+
+' ═══════════════════════════════════════════════
+'  RELATIONS D'HÉRITAGE / ASSOCIATIONS UTILISATEUR
+' ═══════════════════════════════════════════════
+Utilisateur "1" o-- "0..1" Formateur   : est lié à >
+Utilisateur "0..*" --o "0..1" Secteur  : appartient à >
+Utilisateur -- Role
+
+' ═══════════════════════════════════════════════
+'  RELATIONS DE COMPOSITION / AGRÉGATION
+' ═══════════════════════════════════════════════
+
+' Secteur → Filière → Groupe
+Secteur "1" *-- "1..*" Filiere    : contient >
+Filiere "1" *-- "1..*" Groupe     : regroupe >
+
+' Groupe → Module, EmploiDuTemps, Stage
+Groupe "1" *-- "0..*" Module         : possède >
+Groupe "1" *-- "0..*" EmploiDuTemps  : planifié par >
+Groupe "1" *-- "0..*" Stage          : effectue >
+
+' Formateur → Module, Planning, Absences, EmploiFormateur
+Formateur "1" --o "0..*" Module             : enseigne >
+Formateur "1" --o "0..*" Planning           : chargé de >
+Formateur "1" *-- "0..*" FormateurAbsence   : enregistre >
+Formateur "1" *-- "0..*" FormateurEmploi    : dispose >
+
+' Planning → Groupe (relation directe — planning.groupe_id)
+Planning "0..*" --> "1" Groupe  : concerne >
+
+' Module → Planning
+Module "1" --o "1..*" Planning    : planifié dans >
+
+' Planning → PlanningSemaine
+Planning "1" *-- "0..*" PlanningSemaine  : décomposé en >
+
+' EmploiDuTemps → EmploiSeance
+EmploiDuTemps "1" *-- "0..*" EmploiSeance  : contient >
+
+' EmploiSeance → Salle, Module, Formateur
+EmploiSeance "0..*" --> "1" Salle       : utilise >
+EmploiSeance "0..*" --> "1" Module      : concerne >
+EmploiSeance "0..*" --> "1" Formateur   : animée par >
+
+' EmploiDuTemps créé par un Utilisateur
+EmploiDuTemps "0..*" --> "1" Utilisateur : créé par >
+
+' PoleSecteur (table d'association enrichie)
+PoleSecteur "0..1" --> "1" Secteur    : gère >
+PoleSecteur "0..1" --> "1" Formateur  : assigné à >
+
+' Énumérations
+Groupe -- StatutGroupe
+Groupe -- ModeGroupe
+Planning -- ModeFormation
+Planning -- Semestre
+Module -- Semestre
+Stage -- StatutStage
+
+@enduml

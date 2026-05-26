@@ -18,6 +18,8 @@ import DirecteurPole         from "./pages/directeur/Pole";
 import DirecteurAlertes         from "./pages/directeur/Alertes";
 import DirecteurUtilisateurs    from "./pages/directeur/Utilisateurs";
 import DirecteurSuiviJournalier from "./pages/directeur/SuiviJournalier";
+import MotDePasseOublie from "./pages/MotDePassOublie";
+import ReinitialisationMotDePasse from "./pages/ReinitialisationMotDePasse";
 
 // Rôle Pôle
 import PoleLayout            from "./pages/pole/PoleLayout";
@@ -47,6 +49,8 @@ export default function App() {
           {/* Pages publiques */}
           <Route path="/home"  element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/mot-de-passe-oublie"           element={<MotDePasseOublie />} />
+          <Route path="/reinitialisation-mot-de-passe" element={<ReinitialisationMotDePasse />} />
           <Route path="/"      element={<HomeRedirect />} />
 
           {/* Espace Stagiaire */}
