@@ -53,7 +53,9 @@ Route::get('/public-emploi', function (\Illuminate\Http\Request $request) {
         'grille'           => $emploi->grille,
     ]]);
 });
-
+Route::post('/forgot-password',        [PasswordResetController::class, 'sendLink']);
+Route::get('/forgot-password/info',    [PasswordResetController::class, 'getInfo']);
+Route::post('/reset-password',         [PasswordResetController::class, 'reset']);
 // Route publique : statistiques générales pour la page d'accueil (sans authentification)
 Route::get('/public-stats', function () {
     return response()->json([
