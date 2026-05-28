@@ -16,6 +16,7 @@ use App\Http\Controllers\SalleController;
 use App\Http\Controllers\StageController;
 use App\Http\Controllers\FormateurAbsenceController;
 use App\Http\Controllers\SemaineAcademiqueController;
+use App\Http\Controllers\PasswordResetController;   
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
